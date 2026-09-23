@@ -1,0 +1,1786 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MovieVote — что смотрим сегодня?</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🎬%3C/text%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg1:#060d2b; --bg2:#0a1c52; --bg3:#071031;
+    --panel:rgba(13,26,68,.55); --panel-border:rgba(120,160,255,.16);
+    --text:#e8eeff; --muted:#93a5d4;
+    --accent1:#2f7bff; --accent2:#7a5cff; --cyan:#38d4ff;
+    --ok:#2fd08a; --err:#ff5d7a;
+    --radius:16px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    margin:0; color:var(--text);
+    font-family:'Segoe UI', system-ui, -apple-system, Roboto, Arial, sans-serif;
+    background:
+      radial-gradient(1100px 750px at 12% -5%, rgba(38,84,220,.35), transparent 60%),
+      radial-gradient(900px 650px at 88% 12%, rgba(0,190,255,.18), transparent 55%),
+      radial-gradient(1200px 900px at 50% 115%, rgba(96,60,255,.22), transparent 60%),
+      linear-gradient(160deg, var(--bg1), var(--bg2) 55%, var(--bg3));
+    background-attachment:fixed;
+    display:flex; flex-direction:column; min-height:100vh;
+  }
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:rgba(120,160,255,.25);border-radius:8px}
+  ::-webkit-scrollbar-track{background:transparent}
+
+  /* ───────── Верхняя панель ───────── */
+  .topbar{
+    display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+    padding:12px clamp(14px,3vw,32px);
+    border-bottom:1px solid rgba(120,160,255,.14);
+    background:rgba(6,13,43,.6); backdrop-filter:blur(14px);
+    position:sticky; top:0; z-index:50;
+  }
+  .brand{font-size:20px; font-weight:700; letter-spacing:.3px; display:flex; align-items:center; gap:9px; white-space:nowrap}
+  .brand .logo{font-size:24px}
+  .brand b{background:linear-gradient(90deg,#8db4ff,#59e0ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+  nav{display:flex; gap:8px; margin-left:auto; overflow-x:auto}
+  .nav-btn{
+    border:1px solid rgba(140,175,255,.22); background:rgba(255,255,255,.04);
+    color:var(--text); padding:9px 18px; border-radius:12px; font-size:15px; cursor:pointer;
+    transition:.18s; white-space:nowrap; font-family:inherit;
+  }
+  .nav-btn:hover{background:rgba(120,160,255,.14)}
+  .nav-btn.active{
+    background:linear-gradient(135deg,var(--accent1),var(--accent2));
+    border-color:transparent; box-shadow:0 4px 18px rgba(47,123,255,.4);
+  }
+  .demo-banner{
+    display:none; width:100%; margin-top:2px; padding:7px 14px; border-radius:10px;
+    background:rgba(255,210,102,.08); border:1px solid rgba(255,210,102,.25);
+    color:#ffd98a; font-size:13.5px;
+  }
+  .demo-banner a{color:#ffe3a3; cursor:pointer; text-decoration:underline}
+  body.demo .demo-banner{display:block}
+
+  main{flex:1; min-height:0; padding:clamp(14px,2.5vw,28px) clamp(14px,3vw,32px) 30px; overflow:auto}
+  .view{display:none}
+  .view.active{display:block; animation:viewIn .25s ease}
+  #view-voting.active{display:flex; flex-direction:column; height:100%}
+  @keyframes viewIn{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
+
+  h1{margin:2px 0 16px; font-size:clamp(22px,3vw,30px)}
+  .hint{color:var(--muted); font-size:13.5px; line-height:1.5}
+  .panel{
+    background:var(--panel); border:1px solid var(--panel-border);
+    border-radius:var(--radius); padding:18px 20px; backdrop-filter:blur(12px);
+  }
+  .panel h2{margin:0 0 12px; font-size:16.5px}
+  a{color:#7db2ff}
+
+  /* ───────── Кнопки ───────── */
+  button{font-family:inherit}
+  .btn{
+    border:none; cursor:pointer; border-radius:12px; padding:11px 22px; font-size:15px; color:#fff;
+    background:linear-gradient(135deg,var(--accent1),var(--accent2)); transition:.18s;
+  }
+  .btn:hover:not(:disabled){transform:translateY(-1px); box-shadow:0 6px 22px rgba(47,123,255,.45)}
+  .btn:disabled{opacity:.45; cursor:not-allowed}
+  .btn.big{font-size:17px; padding:13px 30px; border-radius:14px}
+  .btn.ghost{
+    background:rgba(255,255,255,.05); border:1px solid rgba(140,175,255,.28); color:var(--text);
+  }
+  .btn.ghost:hover:not(:disabled){background:rgba(120,160,255,.13); box-shadow:none}
+  .btn.ghost:disabled{opacity:.35}
+
+  /* ───────── Настройки ───────── */
+  #view-settings.active{display:flex; flex-direction:column; height:100%}
+  .settings-layout{display:flex; gap:20px; flex:1; min-height:0}
+  .settings-left{width:min(460px, 44vw); flex:none; min-height:0; overflow-y:auto;
+    display:flex; flex-direction:column; gap:14px; padding-right:6px}
+  .settings-left h1{margin:0}
+  .settings-top{display:flex; flex-direction:column; gap:14px}
+  .list-side{flex:1; min-width:0; display:flex; flex-direction:column; min-height:0}
+  #view-settings .settings-actions{flex:none; margin:0}
+  @media (max-width:900px){
+    #view-settings.active{height:auto}
+    .settings-layout{flex-direction:column}
+    .settings-left{width:auto; overflow:visible}
+    .list-panel{overflow:visible; flex:none}
+  }
+  .key-row{display:flex; gap:8px}
+  .key-row input{
+    flex:1; min-width:0; background:rgba(4,10,35,.55); border:1px solid rgba(140,175,255,.25);
+    border-radius:10px; padding:10px 12px; color:var(--text); font-size:14px; font-family:inherit;
+  }
+  .key-row input:focus{outline:none; border-color:var(--cyan); box-shadow:0 0 0 3px rgba(56,212,255,.15)}
+  .api-status{margin-top:10px; font-size:13.5px; color:var(--muted)}
+  .api-status.ok{color:var(--ok)} .api-status.err{color:var(--err)}
+
+  .dropzone{
+    border:2px dashed rgba(140,175,255,.35); border-radius:14px; padding:16px; text-align:center;
+    color:var(--muted); font-size:14px; cursor:pointer; transition:.18s; line-height:1.55;
+  }
+  .dropzone:hover,.dropzone.drag-over{border-color:var(--cyan); background:rgba(56,212,255,.06); color:var(--text)}
+
+  .list-panel{flex:1; min-height:0; overflow-y:auto; margin-bottom:12px}
+
+  /* ───────── превью-постер: клик открывает Кинопоиск ───────── */
+  .poster-thumb{position:relative; width:46px; height:68px; border-radius:8px; overflow:hidden; flex:none;
+    display:grid; place-items:center; background:#101d4d; color:#5f74ad; font-size:20px}
+  a.poster-thumb{text-decoration:none}
+  a.poster-thumb.linked{cursor:pointer; transition:transform .15s, box-shadow .15s}
+  a.poster-thumb.linked:hover{transform:scale(1.06); box-shadow:0 0 0 2px var(--cyan), 0 6px 16px rgba(56,212,255,.25)}
+  .poster-thumb img{width:100%; height:100%; object-fit:cover; display:block}
+  .open-ico{
+    position:absolute; top:2px; right:2px; width:15px; height:15px; border-radius:4px;
+    background:rgba(5,10,35,.72); display:grid; place-items:center; pointer-events:none;
+  }
+  .open-ico[hidden]{display:none} /* display:grid перебивает hidden */
+
+  /* ───────── ИИ-подбор ───────── */
+  .ai-panel{margin-bottom:16px}
+  .ai-cfg{display:grid; grid-template-columns:minmax(130px,180px) 1fr minmax(150px,220px); gap:8px; margin-bottom:10px}
+  .ai-cfg select, .ai-row select{
+    background:rgba(4,10,35,.55); border:1px solid rgba(140,175,255,.25); border-radius:10px;
+    padding:10px 12px; color:var(--text); font-size:14px; font-family:inherit;
+  }
+  .ai-cfg input{
+    background:rgba(4,10,35,.55); border:1px solid rgba(140,175,255,.25); border-radius:10px;
+    padding:10px 12px; color:var(--text); font-size:14px; font-family:inherit; min-width:0;
+  }
+  .ai-cfg input:focus, .ai-cfg select:focus, .ai-row select:focus{outline:none; border-color:var(--cyan)}
+  .ai-panel textarea{
+    width:100%; background:rgba(4,10,35,.5); border:1px solid rgba(140,175,255,.22); border-radius:10px;
+    padding:11px 13px; color:var(--text); font-size:15px; font-family:inherit; resize:vertical; min-height:56px;
+  }
+  .ai-panel textarea:focus{outline:none; border-color:var(--cyan); box-shadow:0 0 0 3px rgba(56,212,255,.15)}
+  .ai-row{display:flex; gap:10px; margin-top:10px; align-items:center}
+  .ai-row input[type=number]{
+    width:88px; background:rgba(4,10,35,.55); border:1px solid rgba(140,175,255,.25); border-radius:10px;
+    padding:10px 12px; color:var(--text); font-size:14px; font-family:inherit;
+  }
+  .ai-row input[type=number]:focus{outline:none; border-color:var(--cyan)}
+  .ai-row .btn{margin-left:auto}
+  #ai-check{margin-left:0}
+  @media (max-width:760px){ .ai-cfg{grid-template-columns:1fr} }
+  #movie-rows{display:flex; flex-direction:column; gap:9px; margin-bottom:12px}
+  .mrow{
+    display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:14px;
+    background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.07); transition:border-color .2s, background .2s;
+  }
+  .mrow.picked{border-color:rgba(77,163,255,.4); background:rgba(47,123,255,.08)}
+  .mrow.dragging{opacity:.35; border-style:dashed}
+  .drag-handle{
+    cursor:grab; color:#7d92c9; user-select:none; padding:6px 2px; font-size:15px; letter-spacing:-2px; flex:none;
+  }
+  .drag-handle:active{cursor:grabbing}
+  .title-wrap{position:relative; flex:1; min-width:0}
+  .title-input{
+    width:100%; background:rgba(4,10,35,.5); border:1px solid rgba(140,175,255,.22);
+    border-radius:10px; padding:11px 13px; color:var(--text); font-size:15.5px; font-family:inherit;
+  }
+  .title-input:focus{outline:none; border-color:var(--cyan); box-shadow:0 0 0 3px rgba(56,212,255,.15)}
+  .title-meta{margin-top:4px; font-size:12px; line-height:1.35; color:var(--muted);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .mrow.picked .title-meta{color:#a9c4f0}
+  .mrow.picked .title-input{border-color:rgba(47,208,138,.45)}
+
+  /* ───────── выпадашка с выбором фильма ───────── */
+  /* живёт в body с position:fixed и позиционируется из JS:
+     не обрезается скроллящейся колонкой, открывается вниз, а если места нет — вверх */
+  .suggest{
+    position:fixed; z-index:120; width:370px; max-height:min(340px, 55vh);
+    background:#0c1740f2; border:1px solid rgba(140,175,255,.35); border-radius:14px;
+    box-shadow:0 18px 50px rgba(0,4,25,.6); overflow:hidden; overflow-y:auto;
+  }
+  .s-item{display:flex; gap:11px; padding:9px 12px; cursor:pointer; align-items:center; transition:background .12s}
+  .s-item:hover,.s-item.hl{background:rgba(77,163,255,.16)}
+  .s-item img{width:42px; height:62px; object-fit:cover; border-radius:6px; flex:none; background:#13235c}
+  .s-item .ph{width:42px;height:62px;border-radius:6px;flex:none;display:grid;place-items:center;background:#13235c;font-size:19px}
+  .s-item > div{flex:1; min-width:0}
+  /* иконка «открыть на Кинопоиске» у варианта в выпадашке — клик не закрывает список */
+  .s-open{flex:none; align-self:center; width:26px; height:40px; margin-left:6px; display:grid; place-items:center;
+    border-radius:8px; background:rgba(56,212,255,.10); border:1px solid rgba(56,212,255,.28); transition:.15s}
+  .s-open:hover{background:rgba(56,212,255,.24); transform:scale(1.08)}
+  .s-name{font-size:14.5px; font-weight:600; line-height:1.25}
+  .s-meta{font-size:12.5px; color:var(--muted); margin-top:3px}
+  .s-note{padding:11px 14px; font-size:13px; color:var(--muted)}
+  .s-note b{color:var(--text)}
+
+  .poster-thumb{
+    width:46px; height:68px; border-radius:8px; overflow:hidden; flex:none;
+    display:grid; place-items:center; background:#101d4d; color:#5f74ad; font-size:20px;
+  }
+  .poster-thumb img{width:100%; height:100%; object-fit:cover; display:block}
+  .row-del{
+    flex:none; border:none; background:transparent; color:#7d92c9; font-size:17px; cursor:pointer;
+    padding:8px 7px; border-radius:9px; transition:.15s; line-height:1;
+  }
+  .row-del:hover{color:var(--err); background:rgba(255,93,122,.12)}
+  #add-row{width:100%}
+  .count-chip{color:var(--muted); font-weight:400; font-size:13.5px; margin-left:8px}
+  .settings-actions{display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap}
+  .btn.danger{color:#ff8ba0; border-color:rgba(255,93,122,.45)}
+  .btn.danger:hover:not(:disabled){background:rgba(255,93,122,.12); box-shadow:none}
+  .btn.danger-solid{background:linear-gradient(135deg,#e5484d,#b3261e)}
+
+  /* ───────── Диалог подтверждения ───────── */
+  .modal-overlay{
+    position:fixed; inset:0; z-index:150; display:grid; place-items:center;
+    background:rgba(3,7,25,.72); backdrop-filter:blur(6px);
+    animation:viewIn .18s ease;
+  }
+  .modal-overlay[hidden]{display:none} /* явный display выше перебивает атрибут hidden */
+  .modal{
+    background:#0d1a45f5; border:1px solid rgba(140,175,255,.35); border-radius:18px;
+    padding:24px 26px; width:min(92vw,420px); box-shadow:0 24px 70px rgba(0,4,25,.7);
+  }
+  .modal h3{margin:0 0 10px; font-size:19px}
+  .modal p{margin:0 0 20px; color:var(--muted); font-size:14.5px; line-height:1.5}
+  .modal-actions{display:flex; justify-content:flex-end; gap:10px}
+  .modal-input{
+    background:rgba(4,10,35,.55); border:1px solid rgba(140,175,255,.25); border-radius:10px;
+    padding:11px 13px; color:var(--text); font-size:15px; font-family:inherit;
+  }
+  .modal-input:focus{outline:none; border-color:var(--cyan); box-shadow:0 0 0 3px rgba(56,212,255,.15)}
+
+  /* ───────── Пустое состояние ───────── */
+  .empty-state{
+    text-align:center; padding:56px 20px; color:var(--muted); font-size:16px;
+    border:2px dashed rgba(140,175,255,.25); border-radius:var(--radius);
+  }
+  .empty-state .ico{font-size:44px; display:block; margin-bottom:10px}
+  .empty-state .btn{margin-top:16px}
+
+  /* ───────── Рулетка ───────── */
+  #view-roulette{max-width:1200px; margin:0 auto}
+  .mode-head{display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:14px}
+  .mode-head h1{margin:0}
+  .mode-head .btn{margin-left:auto}
+  #roulette-stage{position:relative}
+  .carousel-wrap{
+    position:relative; overflow:hidden; border-radius:var(--radius); padding:20px 0 14px;
+    background:rgba(6,13,43,.5); border:1px solid var(--panel-border);
+    -webkit-mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);
+    mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);
+  }
+  .winner-frame{
+    position:absolute; left:50%; top:20px; width:var(--cw,150px); height:calc(var(--cw,150px)*1.5);
+    transform:translateX(-50%); z-index:5; pointer-events:none;
+    border:3px solid var(--cyan); border-radius:14px;
+    box-shadow:0 0 24px 3px rgba(56,212,255,.5), inset 0 0 16px rgba(56,212,255,.22);
+  }
+  .winner-frame::after{
+    content:''; position:absolute; inset:-9px; border-radius:20px;
+    border:1px solid rgba(56,212,255,.35);
+  }
+  .carousel{display:flex; gap:12px; will-change:transform}
+  .c-card{width:var(--cw,150px); flex:none; transition:filter .3s}
+  .c-card img{
+    width:100%; aspect-ratio:2/3; object-fit:cover; border-radius:12px; display:block;
+    background:#101d4d; box-shadow:0 8px 22px rgba(0,4,25,.5); user-select:none;
+  }
+  .c-name{
+    margin-top:7px; font-size:12.5px; color:var(--muted); text-align:center; line-height:1.25; height:2.5em;
+    overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+  }
+  .carousel.spinning .c-card{filter:saturate(.8) brightness(.85)}
+  .carousel.spinning .c-card:nth-child(5n+2){animation:wob .5s ease-in-out infinite alternate}
+  @keyframes wob{from{transform:translateY(-2px)}to{transform:translateY(2px)}}
+  .c-card.won{filter:none}
+  .c-card.won img{
+    box-shadow:0 0 0 3px var(--cyan), 0 0 40px 6px rgba(56,212,255,.55);
+    animation:wonPulse 1.2s ease-in-out infinite alternate;
+  }
+  @keyframes wonPulse{from{transform:scale(1)}to{transform:scale(1.045)}}
+
+  /* ───────── Победитель ───────── */
+  #roulette-result,#voting-winner{position:relative}
+  .winner-card{
+    display:flex; gap:26px; align-items:center; justify-content:center; flex-wrap:wrap;
+    padding:26px clamp(16px,3vw,40px); margin-top:18px;
+    background:linear-gradient(135deg,rgba(47,123,255,.16),rgba(122,92,255,.14));
+    border:1px solid rgba(120,190,255,.35); border-radius:20px;
+    animation:viewIn .4s ease; overflow:hidden;
+  }
+  .winner-poster{
+    height:min(52vh,430px); width:auto; aspect-ratio:2/3; object-fit:cover; border-radius:14px;
+    box-shadow:0 18px 55px rgba(0,4,25,.65), 0 0 0 1px rgba(160,200,255,.25);
+  }
+  .winner-info{max-width:520px; min-width:260px}
+  .winner-info .eyebrow{color:var(--cyan); font-weight:700; letter-spacing:1.5px; text-transform:uppercase; font-size:13px}
+  .winner-info h2{margin:8px 0 6px; font-size:clamp(26px,4vw,40px); line-height:1.1}
+  .wmeta{color:var(--muted); font-size:15px; margin-bottom:20px}
+  .links{display:flex; gap:10px; flex-wrap:wrap}
+  .copy-hint{margin-top:12px; font-size:13px; color:var(--muted); line-height:1.4}
+  .link-btn{
+    display:inline-flex; align-items:center; gap:8px; text-decoration:none; color:#fff;
+    padding:11px 20px; border-radius:12px; font-size:14.5px; font-weight:600; transition:.18s;
+    box-shadow:0 4px 14px rgba(0,4,25,.35);
+  }
+  .link-btn:hover{transform:translateY(-2px)}
+  .link-btn.kp{background:linear-gradient(135deg,#ff5500,#ff8a3d)}
+  .link-btn.okko{background:linear-gradient(135deg,#c247ff,#7a2fff)}
+  .link-btn.kion{background:linear-gradient(135deg,#e60000,#ff5100)}
+  .link-btn.kw{background:linear-gradient(135deg,#4a505c,#0f1216); border:1px solid rgba(255,255,255,.16)}
+  .confetti-p{position:absolute; top:-12px; z-index:3; pointer-events:none; animation:confFall var(--d) ease-in var(--dl) forwards; opacity:0}
+  @keyframes confFall{
+    0%{opacity:1; transform:translate3d(0,-10px,0) rotate(0)}
+    100%{opacity:0; transform:translate3d(var(--x),62vh,0) rotate(var(--r))}
+  }
+
+  /* ───────── Голосование ───────── */
+  .voting-controls{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-left:auto}
+  #voting-count{color:var(--muted); font-size:14.5px; background:rgba(255,255,255,.05); border:1px solid rgba(140,175,255,.2); padding:8px 14px; border-radius:10px; white-space:nowrap}
+  .voting-hint{color:var(--muted); font-size:14px; margin:0 0 12px}
+  #voting-area{flex:1; min-height:300px; position:relative}
+  #voting-grid{
+    display:grid; height:100%; justify-content:center; align-content:center; gap:14px;
+  }
+  .v-card{position:relative; cursor:pointer; border-radius:14px; padding:0; border:none; background:none; animation:vpop .35s cubic-bezier(.3,1.4,.5,1)}
+  @keyframes vpop{from{opacity:0; transform:scale(.6)}to{opacity:1; transform:scale(1)}}
+  .v-card img{
+    width:100%; aspect-ratio:2/3; object-fit:cover; border-radius:14px; display:block; background:#101d4d;
+    box-shadow:0 10px 28px rgba(0,4,25,.5); transition:box-shadow .18s, transform .18s; user-select:none;
+  }
+  .v-card .v-title{
+    position:absolute; left:0; right:0; bottom:0; padding:58px 10px 10px; border-radius:0 0 14px 14px;
+    background:linear-gradient(180deg,transparent,rgba(3,8,30,.95) 62%);
+    display:flex; flex-direction:column; justify-content:flex-end; pointer-events:none;
+    font-size:clamp(14px,1.5vw,20px);
+  }
+  .v-card .v-name{
+    color:#fff; font-weight:700; line-height:1.25; text-align:center;
+    text-shadow:0 1px 10px rgba(0,0,25,.85);
+    overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+  }
+  .v-card .v-year{font-size:.78em; font-weight:500; color:#cddcf7; text-align:center; line-height:1.3; margin-top:3px}
+  .v-card:hover img{transform:scale(1.035); box-shadow:0 0 0 2px var(--cyan), 0 14px 34px rgba(56,212,255,.3)}
+  .v-card .v-open{
+    position:absolute; top:6px; right:6px; width:26px; height:26px; border-radius:8px; z-index:2;
+    background:rgba(5,10,35,.72); display:grid; place-items:center;
+    opacity:0; pointer-events:none; transition:opacity .15s, transform .15s, background .15s;
+  }
+  .v-card:hover .v-open.has-link{opacity:1; pointer-events:auto}
+  .v-card .v-open.has-link:hover{transform:scale(1.12); background:rgba(56,212,255,.4)}
+  .v-card.out{animation:vout .34s ease forwards; pointer-events:none}
+  @keyframes vout{to{opacity:0; transform:scale(.55) rotate(6deg); filter:saturate(.2)}}
+  .v-final{
+    display:flex; align-items:center; justify-content:center; height:100%; flex-wrap:wrap; gap:8px 22px;
+    color:var(--muted); font-size:17px; text-align:center;
+  }
+
+  /* ───────── Тосты ───────── */
+  #toasts{position:fixed; bottom:22px; left:50%; transform:translateX(-50%); z-index:200; display:flex; flex-direction:column; gap:8px; align-items:center}
+  .toast{
+    background:#0e1c4af5; border:1px solid rgba(140,175,255,.4); color:var(--text);
+    padding:11px 20px; border-radius:12px; font-size:14.5px; box-shadow:0 12px 34px rgba(0,4,25,.55);
+    opacity:0; transform:translateY(12px); transition:.28s; max-width:min(90vw,520px); text-align:center;
+  }
+  .toast.show{opacity:1; transform:none}
+  .toast.ok{border-color:rgba(47,208,138,.55)}
+  .toast.err{border-color:rgba(255,93,122,.6)}
+
+  @media (max-width:640px){
+    .mode-head .btn{margin-left:0; width:100%}
+    .winner-poster{height:min(46vh,360px)}
+    nav{width:100%; margin-left:0}
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="logo">🎬</span><span>Movie<b>Vote</b></span></div>
+  <nav>
+    <button class="nav-btn" id="nav-settings">⚙️ Настройки</button>
+    <button class="nav-btn" id="nav-roulette">🎰 Рулетка</button>
+    <button class="nav-btn" id="nav-voting">🗳️ Голосование</button>
+  </nav>
+  <div class="demo-banner">Демо-режим: постеры — заглушки. <a data-goto="settings">Добавьте API-ключ ПоискКино</a> в настройках, чтобы подтягивались настоящие афиши.</div>
+</header>
+
+<main>
+
+  <!-- ═══════════ НАСТРОЙКИ ═══════════ -->
+  <section class="view" id="view-settings">
+    <div class="settings-layout">
+
+      <div class="settings-left">
+        <h1>Настройки</h1>
+
+        <div class="settings-top">
+          <div class="panel">
+            <h2>🔎 База фильмов</h2>
+            <p class="hint" style="margin:0 0 10px">
+              Автодополнение и постеры — из базы <a href="https://poiskkino.dev/documentation" target="_blank" rel="noopener">ПоискКино</a>.
+              Бесплатный тариф — 200 запросов в сутки. Токен выдаёт Telegram-бот
+              <a href="https://t.me/poiskkinodev_bot" target="_blank" rel="noopener">@poiskkinodev_bot</a> — вставьте его сюда:
+            </p>
+            <div class="key-row">
+              <input id="api-key" type="password" placeholder="API-ключ (токен) ПоискКино" autocomplete="off" spellcheck="false">
+              <button class="btn ghost" id="api-check">Проверить</button>
+            </div>
+            <div class="api-status" id="api-status">Демо-режим: без ключа постеры будут заглушками.</div>
+            <p class="hint" style="margin:8px 0 0">
+              💡 Ключи можно один раз вписать в файл <b>env</b> рядом с index.html — при загрузке страницы они подхватятся сами.
+              После правки файла нажмите <button class="btn ghost" id="env-reload" style="padding:3px 10px; font-size:12.5px; vertical-align:middle">↻ Перечитать env</button>
+            </p>
+          </div>
+
+          <div class="panel">
+            <h2>📂 Загрузить списком</h2>
+            <div class="dropzone" id="dropzone">
+              Перетащите файл сюда или кликните для выбора<br>
+              <b>.txt / .csv</b> — названия через запятую или каждое с новой строки<br>
+              <b>.xlsx / .xls</b> — таблица Excel (берутся все заполненные ячейки)<br>
+              <b>.json</b> — список, сохранённый кнопкой «Сохранить список»
+            </div>
+            <input type="file" id="file-input" hidden accept=".txt,.csv,.xlsx,.xls,.json">
+          </div>
+        </div>
+
+        <div class="panel ai-panel">
+          <h2>🤖 Подобрать фильмы с ИИ</h2>
+          <p class="hint" style="margin:0 0 10px">
+            Опишите словами, что хочется посмотреть — жанры, настроение, похожие фильмы.
+            ИИ предложит названия, и они сразу появятся в списке справа с постерами.
+          </p>
+          <div class="ai-cfg">
+            <select id="ai-provider" title="Провайдер ИИ">
+              <option value="zai">Z.ai (GLM)</option>
+              <option value="openai">OpenAI</option>
+              <option value="deepseek">DeepSeek</option>
+              <option value="custom">Другой (OpenAI-совместимый)</option>
+            </select>
+            <input id="ai-model" placeholder="Модель" spellcheck="false">
+            <input id="ai-url" placeholder="https://api.example.com/v1/chat/completions" spellcheck="false" hidden>
+            <input id="ai-key" type="password" placeholder="AI API-ключ" autocomplete="off" spellcheck="false">
+          </div>
+          <textarea id="ai-query" rows="2" spellcheck="false"
+            placeholder="Например: космическая фантастика уровня «Интерстеллара» и «Прибытия», что-нибудь вдумчивое, не боевик"></textarea>
+          <div class="ai-row">
+            <input id="ai-count" type="number" min="1" max="20" step="1" value="7"
+                   title="Сколько фильмов предложить (1–20)">
+            <button class="btn ghost" id="ai-check" title="Отправить минимальный тестовый запрос">Проверить ключ</button>
+            <button class="btn" id="ai-go">✨ Подобрать</button>
+          </div>
+          <div class="api-status" id="ai-status"></div>
+        </div>
+      </div>
+
+      <div class="list-side">
+        <div class="panel list-panel">
+          <h2 style="display:flex; align-items:center; gap:8px">Фильмы <span class="count-chip" id="movie-count"></span>
+            <button class="btn ghost" id="fetch-meta" title="Найти фильмы в базе ПоискКино: постеры, годы, рейтинги и страницы Кинопоиска (~1 запрос на фильм)">🔗 Подтянуть постеры</button>
+          </h2>
+          <div id="movie-rows"></div>
+          <button class="btn ghost" id="add-row">＋ Добавить фильм</button>
+        </div>
+
+        <div class="settings-actions">
+          <div style="display:flex; gap:10px; flex-wrap:wrap">
+            <button class="btn ghost" id="save-list">💾 Сохранить список</button>
+            <button class="btn ghost danger" id="clear-list">🗑 Очистить список</button>
+          </div>
+          <button class="btn big" id="go-main">К выбору фильма →</button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════ РУЛЕТКА ═══════════ -->
+  <section class="view" id="view-roulette">
+    <div class="mode-head">
+      <h1>🎰 Рулетка</h1>
+      <button class="btn big" id="spin">🎯 Раскрутить</button>
+    </div>
+    <div id="roulette-stage">
+      <div class="carousel-wrap" id="carousel-wrap">
+        <div class="winner-frame" id="winner-frame"></div>
+        <div class="carousel" id="carousel"></div>
+      </div>
+      <div id="roulette-result"></div>
+    </div>
+  </section>
+
+  <!-- ═══════════ ГОЛОСОВАНИЕ ═══════════ -->
+  <section class="view" id="view-voting">
+    <div class="mode-head">
+      <h1>🗳️ Голосование</h1>
+      <div class="voting-controls">
+        <span id="voting-count"></span>
+        <button class="btn ghost" id="voting-undo">↩ Вернуть</button>
+        <button class="btn ghost" id="voting-reset">⟳ Заново</button>
+      </div>
+    </div>
+    <p class="voting-hint" id="voting-hint">Обсуждайте по очереди и убирайте фильмы, которые не готовы смотреть: один клик по постеру — фильма больше нет.</p>
+    <div id="voting-area">
+      <div id="voting-grid"></div>
+      <div id="voting-winner"></div>
+    </div>
+  </section>
+
+</main>
+
+<div id="toasts"></div>
+
+<div class="modal-overlay" id="confirm-modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+    <h3 id="confirm-title">Очистить список фильмов?</h3>
+    <p>Все добавленные фильмы и итоги голосования будут удалены. Действие нельзя отменить.</p>
+    <div class="modal-actions">
+      <button class="btn ghost" id="confirm-no">Отменить</button>
+      <button class="btn danger-solid" id="confirm-yes">Очистить</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="save-modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="save-title">
+    <h3 id="save-title">Сохранить список фильмов</h3>
+    <p>Файл .json со всеми фильмами, постерами и рейтингами — его можно импортировать обратно.</p>
+    <input class="modal-input" id="save-name" type="text" spellcheck="false"
+           placeholder="Имя файла" style="width:100%; margin-bottom:18px">
+    <div class="modal-actions">
+      <button class="btn ghost" id="save-cancel">Отменить</button>
+      <button class="btn" id="save-confirm">💾 Сохранить в файл</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ════════════════════════ утилиты ════════════════════════ */
+const $  = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+const LS_KEY = 'movievote.v1';
+const TYPE_RU = {movie:'фильм', 'tv-series':'сериал', 'tv-show':'ТВ-шоу', cartoon:'мультфильм', anime:'аниме', 'animated-series':'мультсериал'};
+
+let state = { apiKey:'', rows:[], eliminated:[], ai:{provider:'zai', model:'', key:'', url:''} };
+function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch{} }
+function load(){
+  try{
+    const s = JSON.parse(localStorage.getItem(LS_KEY));
+    if (s && Array.isArray(s.rows)) state = {
+      apiKey:s.apiKey||'', rows:s.rows, eliminated:Array.isArray(s.eliminated)?s.eliminated:[],
+      ai: Object.assign({provider:'zai', model:'', key:'', url:''}, s.ai||{}),
+    };
+  }catch{}
+}
+const activeMovies = () => state.rows.filter(r => (r.title||'').trim()).map(r => ({ uid:r.uid, title:r.title.trim(), movie:r.movie||null }));
+const displayName = m => (m.movie && m.movie.name) || m.title;
+
+function toast(msg, kind='info'){
+  const t = document.createElement('div');
+  t.className = 'toast ' + kind; t.textContent = msg;
+  $('#toasts').append(t);
+  requestAnimationFrame(() => t.classList.add('show'));
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 350); }, 2800);
+}
+
+/* ════════════════════════ постер-заглушка (SVG) ════════════════════════ */
+const PAL = [
+  ['#0f2a6b','#3b82f6'], ['#12225e','#8b5cf6'], ['#0b3a5e','#06b6d4'], ['#1e2a78','#ec4899'],
+  ['#0d2f5e','#3b6ef6'], ['#152a63','#a78bfa'], ['#0a3550','#22d3ee'], ['#232061','#f472b6'],
+];
+function wrapLines(text, max){
+  const words = String(text).split(/\s+/).filter(Boolean);
+  const lines = []; let cur = '';
+  for (const w of words){
+    let t = cur ? cur + ' ' + w : w;
+    while (t.length > max){ if (cur && t === cur + ' ' + w){ lines.push(cur); cur=''; t = w; } else { lines.push(t.slice(0,max)); t = t.slice(max); } }
+    cur = t;
+  }
+  if (cur) lines.push(cur);
+  return lines.slice(0,4);
+}
+function placeholderPoster(title, year){
+  const t = String(title || 'Фильм');
+  const h = [...t].reduce((a,c) => a + c.charCodeAt(0), 0);
+  const [c1,c2] = PAL[h % PAL.length];
+  const lines = wrapLines(t, 15);
+  const textSvg = lines.map((l,i) =>
+    `<text x="150" y="${200 + i*36}" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="27" font-weight="700" fill="#ffffff" opacity=".95">${esc(l)}</text>`).join('');
+  const yearSvg = year ? `<text x="150" y="412" text-anchor="middle" font-family="Segoe UI, Arial" font-size="21" fill="#ffffff" opacity=".72">${esc(year)}</text>` : '';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="450" viewBox="0 0 300 450">`
+    + `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs>`
+    + `<rect width="300" height="450" fill="url(#g)"/>`
+    + `<text x="150" y="125" text-anchor="middle" font-size="52">🎬</text>${textSvg}${yearSvg}`
+    + `<rect x="6" y="6" width="288" height="438" rx="12" fill="none" stroke="#ffffff" stroke-opacity=".2"/>`
+    + `</svg>`;
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+function posterFor(m, big=false){
+  const mv = m.movie;
+  if (mv){ if (big && mv.posterBig) return mv.posterBig; if (mv.poster) return mv.poster; }
+  return placeholderPoster(displayName(m), mv && mv.year);
+}
+
+/* ════════════════════════ API ПоискКино (poiskkino.dev) ════════════════════════ */
+const PK_API = 'https://api.poiskkino.dev';
+const qCache = new Map(); /* кэш запросов — беречь суточный лимит 200 шт. */
+
+async function pkFetch(path){
+  const r = await fetch(PK_API + path, { headers:{ 'X-API-KEY': state.apiKey } });
+  if (!r.ok){
+    let msg = 'Ошибка API ' + r.status;
+    try{ const e = await r.json(); if (e && e.message) msg = e.message; }catch{}
+    if (r.status === 401 || r.status === 403) msg = msg || 'Токен некорректен';
+    if (r.status === 429) msg = 'Суточный лимит запросов исчерпан (обновится автоматически)';
+    throw new Error(msg);
+  }
+  return r.json();
+}
+
+/* Информация о токене и остатке лимита — этот запрос бесплатный */
+async function pkTokenInfo(){ return pkFetch('/v1.5/token'); }
+
+async function pkSearch(q){
+  const key = q.trim().toLowerCase();
+  if (qCache.has(key)) return qCache.get(key);
+  const d = await pkFetch(`/v1.4/movie/search?page=1&limit=7&query=${encodeURIComponent(q.trim())}`);
+  const res = (d.docs || []).map(m => ({
+    kpId: m.id,
+    name: m.name || m.alternativeName || q,
+    altName: m.alternativeName || '',
+    year: m.year || (m.releaseYears && m.releaseYears[0]) || '',
+    type: TYPE_RU[m.type] || m.type || '',
+    kp: m.rating && m.rating.kp ? (+m.rating.kp).toFixed(1) : '',
+    imdb: m.rating && m.rating.imdb ? (+m.rating.imdb).toFixed(1) : '',
+    poster: (m.poster && (m.poster.previewUrl || m.poster.url)) || '',
+    posterBig: (m.poster && m.poster.url) || '',
+  }));
+  qCache.set(key, res);
+  return res;
+}
+
+/* ════════════════════════ навигация ════════════════════════ */
+function showView(v){
+  ['settings','roulette','voting'].forEach(x => {
+    $('#view-'+x).classList.toggle('active', x===v);
+    $('#nav-'+x).classList.toggle('active', x===v);
+  });
+  if (v==='roulette') initRoulette(); else stopLoop();
+  if (v==='voting')  layoutVoting(true);
+  $('main').scrollTop = 0;
+}
+$('#nav-settings').onclick = () => showView('settings');
+$('#nav-roulette').onclick = () => showView('roulette');
+$('#nav-voting').onclick   = () => showView('voting');
+document.addEventListener('click', e => {
+  const g = e.target.closest('[data-goto]');
+  if (g) showView(g.dataset.goto);
+});
+
+/* ════════════════════════ настройки: строки ════════════════════════ */
+const rowsEl = $('#movie-rows');
+let draggingEl = null;
+
+/* ───────── дубли ───────── */
+/* запрещён только ОДИН И ТОТ ЖЕ фильм (совпадает ID Кинопоиска после запроса к базе).
+   Разные фильмы с одинаковым названием — легальны, проверка по тексту не делается */
+function findDupRow(r){
+  if (!r.movie || !r.movie.kpId) return null;
+  return state.rows.find(x => x.uid !== r.uid && x.movie && x.movie.kpId === r.movie.kpId) || null;
+}
+
+function updateCount(){
+  const n = activeMovies().length;
+  $('#movie-count').textContent = n ? `${n} шт.` : '';
+}
+function updateRowPicked(rowEl, r){
+  rowEl.classList.toggle('picked', !!r.movie);
+  const thumb = rowEl.querySelector('.poster-thumb');
+  const ico = thumb.querySelector('.open-ico');
+  thumb.querySelector('.pt-img').innerHTML = r.movie
+    ? `<img src="${esc(r.movie.poster || placeholderPoster(r.movie.name, r.movie.year))}" alt="">`
+    : '🎬';
+  const meta = rowEl.querySelector('.title-meta');
+  if (r.movie){
+    meta.textContent = [r.movie.year, r.movie.type,
+      r.movie.kp && 'КП ' + r.movie.kp, r.movie.imdb && 'IMDb ' + r.movie.imdb].filter(Boolean).join(' • ');
+  } else {
+    meta.textContent = '';
+  }
+  if (r.movie && r.movie.kpId){
+    thumb.classList.add('linked');
+    thumb.href = 'https://www.kinopoisk.ru/film/' + r.movie.kpId + '/';
+    thumb.title = '«' + (r.movie.name || r.title) + '» — открыть на Кинопоиске';
+    ico.hidden = false;
+  } else {
+    thumb.classList.remove('linked');
+    thumb.removeAttribute('href');
+    thumb.title = 'Постер';
+    ico.hidden = true;
+  }
+}
+
+/* позиционирование выпадашки у поля ввода: вниз, если есть место, иначе вверх */
+function placeSuggest(dd){
+  const r = dd._input.getBoundingClientRect();
+  const w = Math.max(300, Math.min(430, r.width + 70));
+  dd.style.width = Math.round(w) + 'px';
+  const h = Math.min(dd.scrollHeight, 340);
+  const gap = 6;
+  let top;
+  if (r.bottom + gap + h <= window.innerHeight - 8) top = r.bottom + gap;
+  else if (r.top - gap - h >= 8) top = r.top - h - gap;
+  else top = window.innerHeight - h - 8;
+  const left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8));
+  dd.style.top = Math.round(Math.max(8, top)) + 'px';
+  dd.style.left = Math.round(left) + 'px';
+}
+function showSuggest(dd, html){
+  dd.innerHTML = html;
+  dd.hidden = false;
+  placeSuggest(dd);
+}
+function repositionSuggests(){
+  $$('.suggest').forEach(dd => { if (!dd.hidden && dd._input) placeSuggest(dd); });
+}
+window.addEventListener('resize', repositionSuggests);
+$('main').addEventListener('scroll', repositionSuggests, {passive:true});
+$('.list-panel').addEventListener('scroll', repositionSuggests, {passive:true});
+
+function makeRow(r){
+  const el = document.createElement('div');
+  el.className = 'mrow'; el.dataset.uid = r.uid;
+  el.innerHTML = `
+    <span class="drag-handle" title="Перетащите, чтобы изменить порядок">⠿</span>
+    <div class="title-wrap">
+      <input class="title-input" placeholder="Введите название фильма…" value="${esc(r.title)}" spellcheck="false" autocomplete="off">
+      <div class="title-meta"></div>
+    </div>
+    <a class="poster-thumb" target="_blank" rel="noopener" title="Постер">
+      <span class="pt-img">🎬</span>
+      <span class="open-ico" hidden>
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#cfe3ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+          <path d="M7 17L17 7M9 7h8v8"/>
+        </svg>
+      </span>
+    </a>
+    <button class="row-del" title="Удалить строку">✕</button>`;
+  const input = el.querySelector('.title-input');
+  /* выпадашка живёт в body (position:fixed), иначе её обрезает скроллящаяся колонка */
+  const dd = document.createElement('div');
+  dd.className = 'suggest'; dd.hidden = true;
+  document.body.append(dd);
+  el._dd = dd; dd._row = el; dd._input = input;
+
+  /* перетаскивание за ручку */
+  const handle = el.querySelector('.drag-handle');
+  handle.addEventListener('pointerdown', () => { el.draggable = true; });
+  el.addEventListener('dragstart', e => {
+    if (!el.draggable){ e.preventDefault(); return; }
+    draggingEl = el; el.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    try{ e.dataTransfer.setData('text/plain', r.uid); }catch{}
+  });
+  el.addEventListener('dragend', () => {
+    el.classList.remove('dragging'); el.draggable = false; draggingEl = null;
+    state.rows = $$('#movie-rows .mrow').map(x => state.rows.find(s => s.uid === x.dataset.uid)).filter(Boolean);
+    save();
+  });
+
+  el.querySelector('.row-del').onclick = () => {
+    state.rows = state.rows.filter(x => x.uid !== r.uid);
+    dd.remove();
+    el.remove();
+    if (!state.rows.length) addRow();
+    save(); updateCount();
+  };
+
+  let suggestTimer = null, tok = 0;
+  input.addEventListener('input', () => {
+    r.title = input.value;
+    if (r.movie && input.value !== r.movie.name){ r.movie = null; updateRowPicked(el, r); }
+    saveDebounced(); updateCount();
+    if (el === rowsEl.lastElementChild && input.value.trim()) addRow(); /* автодобавление следующей ячейки */
+    clearTimeout(suggestTimer);
+    if (input.value.trim().length >= 2) suggestTimer = setTimeout(() => runSuggest(), 350);
+    else dd.hidden = true;
+  });
+  input.addEventListener('focus', () => {
+    if (input.value.trim().length >= 2 && !r.movie) runSuggest();
+  });
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Escape'){ dd.hidden = true; input.blur(); }
+    if (e.key === 'Enter' && !dd.hidden){
+      const first = dd.querySelector('.s-item');
+      if (first) first.click();
+      else { dd.hidden = true; input.blur(); }
+    }
+  });
+
+  async function runSuggest(){
+    const q = input.value.trim();
+    if (q.length < 2) return;
+    const my = ++tok;
+    if (!state.apiKey){
+      showSuggest(dd, `<div class="s-note">🔌 Демо-режим: поиск по базе ПоискКино недоступен.<br>Название будет сохранено, постер — заглушка.<br><b><a data-goto="settings" style="cursor:pointer">Указать API-ключ →</a></b></div>`);
+      return;
+    }
+    showSuggest(dd, `<div class="s-note">Поиск «${esc(q)}»…</div>`);
+    try{
+      const res = await pkSearch(q);
+      if (my !== tok || input.value.trim() !== q) return;
+      if (!res.length){
+        showSuggest(dd, `<div class="s-note">Ничего не нашлось. Оставьте как есть — будет постер-заглушка.</div>`);
+        return;
+      }
+      showSuggest(dd, res.map((m, i) => {
+        const meta = [m.year, m.type, m.kp && 'КП ' + m.kp, m.imdb && 'IMDb ' + m.imdb].filter(Boolean).join(' • ');
+        const img = m.poster ? `<img src="${esc(m.poster)}" alt="">` : `<div class="ph">🎬</div>`;
+        const open = m.kpId
+          ? `<span class="s-open" data-href="https://www.kinopoisk.ru/film/${m.kpId}/" title="Открыть на Кинопоиске в новой вкладке — список не закроется">
+               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#9fd8ff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M7 17L17 7M9 7h8v8"/></svg>
+             </span>`
+          : '';
+        return `<div class="s-item" data-i="${i}">${img}<div><div class="s-name">${esc(m.name)}</div><div class="s-meta">${esc(meta)}${m.altName && m.altName!==m.name ? ' · ' + esc(m.altName) : ''}</div></div>${open}</div>`;
+      }).join(''));
+      dd.querySelectorAll('.s-item').forEach(item => {
+        const openBtn = item.querySelector('.s-open');
+        /* иконка: открыть страницу фильма в новой вкладке, выпадашку НЕ закрывать */
+        if (openBtn) openBtn.onclick = e => {
+          e.stopPropagation();
+          const href = openBtn.dataset.href;
+          const w = window.open(href, '_blank');
+          if (w){ try{ w.opener = null; }catch{} } else location.href = href;
+        };
+        item.onclick = e => {
+          if (e.target.closest('.s-open')) return;
+          const m = res[+item.dataset.i];
+          const prev = { movie: r.movie, title: r.title };
+          r.movie = m; r.title = m.name;
+          const dup = findDupRow(r);
+          if (dup){
+            /* дубль: откатываем и оставляем выпадашку открытой — можно выбрать другой вариант */
+            r.movie = prev.movie; r.title = prev.title;
+            toast(`«${m.name}» уже в списке`, 'err');
+            return;
+          }
+          input.value = r.movie.name;
+          dd.hidden = true;
+          updateRowPicked(el, r); save(); updateCount();
+        };
+      });
+    }catch(err){
+      if (my !== tok) return;
+      showSuggest(dd, `<div class="s-note">⚠️ ${esc(err.message)}. Попробуйте ещё раз или оставьте название как есть.</div>`);
+    }
+  }
+  updateRowPicked(el, r);
+  return el;
+}
+
+/* один глобальный клик-ловушка: спрятать все выпадашки, если клик вне их строки и вне самой выпадашки */
+document.addEventListener('click', e => {
+  $$('.suggest').forEach(dd => {
+    if (dd.hidden) return;
+    const inside = (dd._row && dd._row.contains(e.target)) || dd.contains(e.target);
+    if (!inside) dd.hidden = true;
+  });
+});
+
+function addRow(focus=false){
+  const r = { uid: uid(), title:'', movie:null };
+  state.rows.push(r);
+  const el = makeRow(r);
+  rowsEl.append(el);
+  if (focus) el.querySelector('.title-input').focus();
+  save();
+  return el;
+}
+function renderRows(){
+  $$('.suggest').forEach(d => d.remove()); /* выпадашки старых строк жили в body */
+  rowsEl.innerHTML = '';
+  if (!state.rows.length) state.rows.push({uid:uid(), title:'', movie:null});
+  state.rows.forEach(r => rowsEl.append(makeRow(r)));
+  updateCount();
+}
+
+/* переупорядочивание перетаскиванием */
+rowsEl.addEventListener('dragover', e => {
+  if (!draggingEl) return;
+  e.preventDefault();
+  const after = [...rowsEl.querySelectorAll('.mrow:not(.dragging)')].reduce((best, child) => {
+    const box = child.getBoundingClientRect();
+    const offset = e.clientY - (box.top + box.height/2);
+    return (offset < 0 && offset > best.off) ? {off:offset, el:child} : best;
+  }, {off:-Infinity, el:null}).el;
+  if (after == null) rowsEl.append(draggingEl);
+  else rowsEl.insertBefore(draggingEl, after);
+});
+document.addEventListener('pointerup', () => $$('#movie-rows .mrow').forEach(el => el.draggable = false));
+
+$('#add-row').onclick = () => addRow(true);
+$('#fetch-meta').onclick = async () => {
+  const targets = state.rows.filter(r => r.title.trim() && !r.movie);
+  if (!targets.length){ toast('Все фильмы уже связаны с базой', 'info'); return; }
+  if (!state.apiKey){ toast('Сначала укажите ключ ПоискКино', 'err'); return; }
+  const btn = $('#fetch-meta');
+  btn.disabled = true;
+  toast(`Ищем в базе: ${targets.length} из ${activeMovies().length} (≈${targets.length} запросов)`);
+  await backgroundSearch(targets);
+  btn.disabled = false;
+};
+$('#go-main').onclick = () => showView(activeMovies().length ? 'voting' : 'settings');
+
+/* ───────── очистка списка с подтверждением ───────── */
+const confirmModal = $('#confirm-modal');
+$('#clear-list').onclick = () => { confirmModal.hidden = false; $('#confirm-yes').focus(); };
+const closeConfirm = () => { confirmModal.hidden = true; };
+$('#confirm-no').onclick = closeConfirm;
+confirmModal.addEventListener('click', e => { if (e.target === confirmModal) closeConfirm(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !confirmModal.hidden) closeConfirm(); });
+$('#confirm-yes').onclick = () => {
+  state.rows = [];
+  state.eliminated = [];
+  rouletteSig = '';
+  renderRows();
+  save();
+  closeConfirm();
+  toast('Список очищен');
+};
+
+/* ───────── сохранение списка в файл ───────── */
+const saveModal = $('#save-modal'), saveNameInput = $('#save-name');
+function defaultListName(){
+  const d = new Date(), p = n => String(n).padStart(2,'0');
+  return `Список ${p(d.getDate())}.${p(d.getMonth()+1)}.${d.getFullYear()} ${p(d.getHours())}-${p(d.getMinutes())}`;
+}
+$('#save-list').onclick = () => {
+  if (!activeMovies().length){ toast('Список пуст — нечего сохранять', 'err'); return; }
+  saveNameInput.value = '';
+  saveNameInput.placeholder = defaultListName();
+  saveModal.hidden = false;
+  saveNameInput.focus();
+};
+const closeSaveModal = () => { saveModal.hidden = true; };
+$('#save-cancel').onclick = closeSaveModal;
+saveModal.addEventListener('click', e => { if (e.target === saveModal) closeSaveModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !saveModal.hidden) closeSaveModal(); });
+saveNameInput.addEventListener('keydown', e => { if (e.key === 'Enter') $('#save-confirm').click(); });
+
+function buildExport(){
+  return JSON.stringify({
+    app:'movievote', version:1, savedAt:new Date().toISOString(),
+    rows: activeMovies().map(m => ({ title:m.title, movie:m.movie })),
+  }, null, 2);
+}
+/* Диалог сохранения браузера откроется там, куда сохраняли в прошлый раз —
+   один раз укажите папку с index.html, и Chrome будет предлагать её же */
+async function downloadList(filename, dataStr){
+  if (window.showSaveFilePicker){
+    try{
+      const h = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types:[{ description:'Список MovieVote', accept:{ 'application/json':['.json'] } }],
+      });
+      const w = await h.createWritable();
+      await w.write(dataStr);
+      await w.close();
+      return 'saved';
+    }catch(err){
+      if (err && err.name === 'AbortError') return 'cancel';
+      /* любая другая ошибка — пробуем обычное скачивание */
+    }
+  }
+  try{
+    const blob = new Blob([dataStr], { type:'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    return 'downloaded';
+  }catch{ return 'fail'; }
+}
+$('#save-confirm').onclick = async () => {
+  const raw = (saveNameInput.value || '').replace(/[<>:"/\\|?*]+/g, '').trim();
+  const filename = (raw || defaultListName()) + '.json';
+  const data = buildExport();
+  closeSaveModal();
+  const how = await downloadList(filename, data);
+  if (how === 'saved') toast(`Сохранено: ${filename}`, 'ok');
+  else if (how === 'downloaded') toast(`Файл «${filename}» скачан в загрузки — при желании переместите его к index.html`, 'ok');
+  else if (how === 'fail') toast('Не удалось сохранить файл', 'err');
+  /* 'cancel' — закрыли диалог браузера, ничего не делаем */
+};
+
+let saveT = null;
+function saveDebounced(){ clearTimeout(saveT); saveT = setTimeout(save, 300); }
+
+/* ════════════════════════ настройки: API-ключ ════════════════════════ */
+const keyInput = $('#api-key'), apiStatus = $('#api-status');
+function applyKeyUI(){
+  document.body.classList.toggle('demo', !state.apiKey);
+  if (!state.apiKey){ apiStatus.className='api-status'; apiStatus.textContent = 'Демо-режим: без ключа постеры будут заглушками.'; }
+}
+keyInput.value = state.apiKey;
+$('#api-check').onclick = async () => {
+  const key = keyInput.value.trim();
+  state.apiKey = key; save(); applyKeyUI();
+  if (!key){ toast('Ключ убран — включён демо-режим'); return; }
+  apiStatus.className = 'api-status'; apiStatus.textContent = 'Проверяем ключ…';
+  try{
+    const t = await pkTokenInfo();
+    const hrs = t.ttl ? Math.max(1, Math.round(t.ttl/3600)) : null;
+    apiStatus.className = 'api-status ok';
+    apiStatus.textContent = `✔ Ключ принят · осталось ${t.requestsRemaining} из ${t.requestsLimit} запросов на сегодня`
+      + (hrs ? ` (обновится через ~${hrs} ч)` : '');
+    toast('Ключ принят, база ПоискКино подключена', 'ok');
+  }catch(err){
+    apiStatus.className = 'api-status err';
+    apiStatus.textContent = '✖ ' + err.message + '. Проверьте токен от бота @poiskkinodev_bot.';
+    toast(err.message, 'err');
+  }
+};
+keyInput.addEventListener('input', () => { state.apiKey = keyInput.value.trim(); save(); applyKeyUI(); });
+
+/* ════════════════════════ автозагрузка ключей из файла env ════════════════════════ */
+let envFound = null; /* null — файл не искали; true/false — найден при последнем чтении */
+async function loadEnv(){
+  let text = null;
+  for (const name of ['env', '.env']){
+    try{
+      const r = await fetch(name, { cache:'no-store' });
+      if (r.ok){ text = await r.text(); break; }
+    }catch{ /* file:// или файла нет */ }
+  }
+  if (text == null){
+    const wasFound = envFound;
+    envFound = false;
+    if (location.protocol === 'file:'){
+      $('#api-status').textContent = 'Файл env недоступен: страница открыта двойным кликом (file://). Откройте её по адресу http://127.0.0.1:8765/index.html — или просто впишите ключи в поля выше.';
+    } else if (wasFound){
+      toast('Файл env больше не найден', 'err');
+    }
+    return false;
+  }
+  envFound = true;
+  const kv = {};
+  text.replace(/^\uFEFF/, '').split(/\r?\n/).forEach(line => {
+    const l = line.replace(/#.*$/, '').trim().replace(/^export\s+/, '');
+    const i = l.indexOf('=');
+    if (i < 1) return;
+    let v = l.slice(i + 1).trim();
+    if (v.length > 1 && (v.startsWith('"') && v.endsWith('"') || v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
+    kv[l.slice(0, i).trim().toUpperCase()] = v;
+  });
+  let applied = [];
+  if (kv.POISKKINO_API_KEY && kv.POISKKINO_API_KEY !== state.apiKey){ state.apiKey = kv.POISKKINO_API_KEY; keyInput.value = state.apiKey; applied.push('ПоискКино'); }
+  if (kv.AI_PROVIDER && ['zai','openai','deepseek','custom'].includes(kv.AI_PROVIDER) && kv.AI_PROVIDER !== state.ai.provider){ state.ai.provider = kv.AI_PROVIDER; applied.push('ИИ-провайдер'); }
+  if (kv.AI_MODEL && kv.AI_MODEL !== state.ai.model){ state.ai.model = kv.AI_MODEL; applied.push('ИИ-модель'); }
+  if (kv.AI_API_URL && kv.AI_API_URL !== state.ai.url){ state.ai.url = kv.AI_API_URL; applied.push('ИИ-адрес'); }
+  if (kv.AI_API_KEY && kv.AI_API_KEY !== state.ai.key){ state.ai.key = kv.AI_API_KEY; applied.push('ИИ-ключ'); }
+  if (applied.length){
+    applyKeyUI(); applyAiUI(); save();
+    toast('Из файла env загружено: ' + applied.join(', '), 'ok');
+    return true;
+  }
+  if (envFound && !$('#api-key').value && !state.ai.key){
+    $('#api-status').textContent = 'Файл env найден, но ключи в нём пустые — впишите значения после «=».';
+  }
+  return false;
+}
+$('#env-reload').onclick = async () => { await loadEnv(); };
+
+/* ════════════════════════ ИИ-подбор фильмов ════════════════════════ */
+const AI_PROVIDERS = {
+  zai:     { url:'https://api.z.ai/api/paas/v4/chat/completions', model:'glm-4.5-flash' },
+  openai:  { url:'https://api.openai.com/v1/chat/completions',     model:'gpt-4o-mini' },
+  deepseek:{ url:'https://api.deepseek.com/chat/completions',      model:'deepseek-chat' },
+  custom:  { url:'', model:'' },
+};
+const aiProvSel = $('#ai-provider'), aiModelInp = $('#ai-model'), aiUrlInp = $('#ai-url'), aiKeyInp = $('#ai-key');
+function applyAiUI(){
+  const p = state.ai.provider || 'zai';
+  aiProvSel.value = p;
+  aiModelInp.value = state.ai.model || '';
+  aiModelInp.placeholder = AI_PROVIDERS[p].model || 'Модель';
+  aiUrlInp.hidden = p !== 'custom';
+  aiUrlInp.value = state.ai.url || '';
+  aiKeyInp.value = state.ai.key || '';
+}
+aiProvSel.addEventListener('change', () => { state.ai.provider = aiProvSel.value; state.ai.model = ''; save(); applyAiUI(); });
+[aiModelInp, aiUrlInp, aiKeyInp].forEach(inp => inp.addEventListener('input', () => {
+  state.ai.model = aiModelInp.value.trim();
+  state.ai.url = aiUrlInp.value.trim();
+  state.ai.key = aiKeyInp.value.trim();
+  save();
+}));
+
+let aiViaProxy = null; /* null — не проверяли; true — работает локальный прокси server.py */
+async function aiPing(){
+  try{
+    const r = await fetch('/ai-proxy/ping', { cache:'no-store' });
+    if (!r.ok) return false;
+    const j = await r.json();
+    return !!j.proxy;
+  }catch{ return false; }
+}
+async function aiSend(payload, opts = {}){
+  const ai = state.ai;
+  const prov = AI_PROVIDERS[ai.provider] || AI_PROVIDERS.custom;
+  const url = ai.provider === 'custom' ? ai.url.trim() : prov.url;
+  const model = ai.model || prov.model;
+  if (!ai.key) throw new Error('Введите AI API-ключ');
+  if (!url) throw new Error('Укажите адрес API (поле ссылки)');
+  const headers = {'Content-Type':'application/json', 'Authorization':'Bearer ' + ai.key};
+  const body = JSON.stringify(Object.assign({ model }, payload));
+
+  async function parse(r){
+    if (!r.ok){
+      let msg = 'Ошибка AI ' + r.status;
+      try{ const e = await r.json(); msg = (e.error && e.error.message) || e.message || msg; }catch{}
+      throw new Error(msg);
+    }
+    const d = await r.json();
+    const content = d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content;
+    if (!content){
+      /* у рассуждающих моделей (GLM) токены могут уйти в reasoning_content —
+         для проверки ключа этого достаточно */
+      if (opts.allowEmpty && d.choices && d.choices[0]) return '';
+      throw new Error('Пустой ответ модели');
+    }
+    return content;
+  }
+  async function viaProxy(){
+    const r = await fetch('/ai-proxy/custom?target=' + encodeURIComponent(url), { method:'POST', headers, body });
+    return parse(r);
+  }
+
+  /* если поднят server.py — сразу через его прокси (нет CORS и сетевых блокировок) */
+  if (aiViaProxy === null) aiViaProxy = await aiPing();
+  if (aiViaProxy) return viaProxy();
+
+  try{
+    const r = await fetch(url, { method:'POST', headers, body });
+    return await parse(r);
+  }catch(err){
+    /* «Failed to fetch»: CORS или недоступен хост — пробуем через локальный прокси */
+    if (!(await aiPing())){
+      throw new Error('Не удалось связаться с ' + (new URL(url).host)
+        + '. Запустите python server.py (вместо python -m http.server) и обновите страницу, либо проверьте сеть/VPN.');
+    }
+    return viaProxy();
+  }
+}
+async function aiChat(prompt, n){
+  return aiSend({
+    temperature: 0.8,
+    messages:[
+      { role:'system', content:
+        'Ты — кинокуратор для компании, выбирающей фильм на вечер. По описанию пользователя верни ТОЛЬКО строгий JSON вида {"titles":["Название 1","Название 2",...]} — ровно '
+        + n + ' подходящих полнометражных фильмов. Названия на русском, как на Кинопоиске, без года, кавычек и пояснений.'
+        + (activeMovies().length ? ' Не повторяй уже имеющиеся фильмы: ' + activeMovies().map(displayName).join(', ') + '.' : '') },
+      { role:'user', content: prompt },
+    ],
+  });
+}
+$('#ai-check').onclick = async () => {
+  const st = $('#ai-status'), btn = $('#ai-check');
+  btn.disabled = true;
+  st.className = 'api-status'; st.textContent = 'Проверяем ключ…';
+  const t0 = Date.now();
+  try{
+    await aiSend({ max_tokens: 512, messages:[{ role:'user', content:'Ответь ровно одним словом: ОК' }] }, { allowEmpty:true });
+    const model = state.ai.model || (AI_PROVIDERS[state.ai.provider] || {}).model || '';
+    st.className = 'api-status ok';
+    st.textContent = `✔ Ключ принят, модель работает${model ? ' (' + model + ')' : ''} — ответила за ${Math.round((Date.now()-t0)/1000)} с.`;
+  }catch(err){
+    st.className = 'api-status err';
+    st.textContent = '✖ ' + err.message;
+  }
+  btn.disabled = false;
+};
+function parseAiTitles(text){
+  let t = String(text || '').trim();
+  const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fence) t = fence[1].trim();
+  try{
+    const j = JSON.parse(t);
+    if (Array.isArray(j.titles)) return j.titles.map(String);
+    if (Array.isArray(j)) return j.map(String);
+  }catch{}
+  const m = t.match(/\[[\s\S]*\]/);
+  if (m){ try{ return JSON.parse(m[0]).map(String); }catch{} }
+  return t.split(/\n|;|,/).map(s => s.replace(/^[\s\d.)*–—-]+/, '').trim().replace(/[".'«»]+$/g, '')).filter(s => s.length > 1);
+}
+$('#ai-go').onclick = async () => {
+  const q = $('#ai-query').value.trim();
+  let n = Math.round(parseFloat($('#ai-count').value));
+  if (!Number.isFinite(n)) n = 7;
+  const clamped = Math.max(1, Math.min(20, n));
+  if (clamped !== n) toast('За один запрос берём от 1 до 20 фильмов — использую ' + clamped);
+  n = clamped;
+  const st = $('#ai-status');
+  if (q.length < 3){ toast('Опишите подробнее, что посмотреть', 'err'); return; }
+  const btn = $('#ai-go');
+  btn.disabled = true;
+  st.className = 'api-status'; st.textContent = '🤔 ИИ подбирает фильмы…';
+  try{
+    const content = await aiChat(q, n);
+    const titles = [...new Set(parseAiTitles(content))].slice(0, n).map(t => t.trim()).filter(Boolean);
+    if (!titles.length) throw new Error('Не удалось понять ответ модели — попробуйте ещё раз');
+    importTitles(titles);
+    st.className = 'api-status ok';
+    st.textContent = '✔ ИИ предложил: ' + titles.join(', ');
+  }catch(err){
+    st.className = 'api-status err';
+    st.textContent = '✖ ' + err.message;
+  }
+  btn.disabled = false;
+};
+
+/* ════════════════════════ настройки: загрузка файла ════════════════════════ */
+const dz = $('#dropzone'), fileInput = $('#file-input');
+dz.onclick = () => fileInput.click();
+fileInput.onchange = () => { if (fileInput.files[0]) importFile(fileInput.files[0]); fileInput.value=''; };
+['dragover','dragenter'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('drag-over'); }));
+['dragleave','drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('drag-over'); }));
+dz.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f) importFile(f); });
+['dragover','drop'].forEach(ev => window.addEventListener(ev, e => e.preventDefault()));
+
+let sheetJsP = null;
+function loadSheetJS(){
+  if (window.XLSX) return Promise.resolve();
+  if (sheetJsP) return sheetJsP;
+  sheetJsP = new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+    s.onload = res;
+    s.onerror = () => { sheetJsP = null; rej(new Error('Не удалось загрузить библиотеку Excel — проверьте интернет')); };
+    document.head.append(s);
+  });
+  return sheetJsP;
+}
+
+async function importFile(file){
+  const name = (file.name||'').toLowerCase();
+  let titles = [];
+  try{
+    if (name.endsWith('.json')){
+      const text = new TextDecoder('utf-8').decode(await file.arrayBuffer());
+      let data;
+      try{ data = JSON.parse(text); }
+      catch{ throw new Error('Файл .json не читается'); }
+      if (data && data.app === 'movievote' && Array.isArray(data.rows)){
+        importMovies(data.rows);
+        return;
+      }
+      if (Array.isArray(data)) titles = data.map(v => String(v ?? '').trim()).filter(Boolean);
+      else throw new Error('Это не список MovieVote');
+    } else if (name.endsWith('.xlsx') || name.endsWith('.xls')){
+      await loadSheetJS();
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf);
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:false});
+      titles = rows.flat().map(v => String(v ?? '').trim()).filter(Boolean);
+    } else {
+      const buf = await file.arrayBuffer();
+      let text;
+      try{ text = new TextDecoder('utf-8', {fatal:true}).decode(buf); }
+      catch{ text = new TextDecoder('windows-1251').decode(buf); }
+      titles = text.split(/[\n\r;]|,/).map(s => s.trim()).filter(Boolean);
+    }
+  }catch(err){
+    toast(err.message || 'Не удалось прочитать файл', 'err');
+    return;
+  }
+  importTitles(titles);
+}
+
+/* импорт списка, сохранённого кнопкой «Сохранить список»: фильмы приходят
+   вместе с метаданными (постер, год, рейтинги) — поиск по базе не нужен */
+function importMovies(rows){
+  const existing = new Set(state.rows.map(r => (r.title||'').trim().toLowerCase()).filter(Boolean));
+  let added = 0;
+  for (const src of rows){
+    const title = String(src.title || (src.movie && src.movie.name) || '').trim();
+    if (!title || existing.has(title.toLowerCase())) continue;
+    existing.add(title.toLowerCase());
+    const r = { uid:uid(), title, movie: src.movie || null };
+    state.rows.push(r);
+    rowsEl.append(makeRow(r));
+    added++;
+    if (state.rows.length >= 120) break;
+  }
+  state.rows = state.rows.filter(r => r.title.trim());
+  $$('#movie-rows .mrow').forEach(el => {
+    if (!state.rows.some(x => x.uid === el.dataset.uid)){ if (el._dd) el._dd.remove(); el.remove(); }
+  });
+  addRow();
+  updateCount(); save();
+  toast(added ? `Загружено фильмов: ${added} (с постерами и рейтингами)` : 'Все фильмы из файла уже есть в списке', added ? 'ok' : 'info');
+}
+
+function importTitles(titles){
+  titles = titles.map(t => t.replace(/^["'\s]+|["'\s.]+$/g,'').trim()).filter(t => t.length > 1);
+  if (!titles.length){ toast('В файле не нашлось названий', 'err'); return; }
+  const existing = new Set(state.rows.map(r => (r.title||'').trim().toLowerCase()).filter(Boolean));
+  const fresh = [];
+  const seen = new Set();
+  for (const t of titles){
+    const k = t.toLowerCase();
+    if (existing.has(k) || seen.has(k)) continue;
+    seen.add(k); fresh.push(t);
+    if (fresh.length >= 100) break;
+  }
+  if (!fresh.length){ toast('Все фильмы из файла уже в списке'); return; }
+  const added = fresh.map(t => {
+    const r = { uid:uid(), title:t, movie:null };
+    state.rows.push(r);
+    rowsEl.append(makeRow(r));
+    return r;
+  });
+  /* убрать пустые строки-заглушки (и из состояния, и из DOM), внизу оставить одну пустую */
+  state.rows = state.rows.filter(r => r.title.trim());
+  $$('#movie-rows .mrow').forEach(el => {
+    if (!state.rows.some(x => x.uid === el.dataset.uid)){ if (el._dd) el._dd.remove(); el.remove(); }
+  });
+  addRow();
+  updateCount();
+  toast(`Добавлено фильмов: ${added.length}`, 'ok');
+  backgroundSearch(added);
+}
+
+/* автоподбор варианта из базы для списка, загруженного файлом */
+function similarEnough(query, name){
+  const norm = s => String(s).toLowerCase().replace(/ё/g,'е').replace(/[^\wа-яa-z0-9]+/gi,' ').trim();
+  const qw = norm(query).split(/\s+/).filter(w => w.length > 1);
+  if (!qw.length) return false;
+  const nw = norm(name);
+  return qw.filter(w => nw.includes(w)).length / qw.length >= 0.5;
+}
+async function backgroundSearch(rows){
+  if (!state.apiKey) return;
+  let found = 0;
+  for (const r of rows){
+    await sleep(160);
+    const el = rowsEl.querySelector(`.mrow[data-uid="${r.uid}"]`);
+    if (!el || r.movie || !r.title.trim()) continue;
+    try{
+      const res = await pkSearch(r.title.trim());
+      if (r.movie) continue; /* пользователь успел выбрать сам */
+      /* берём результат, только если он действительно похож на запрос,
+         иначе фаззи-поиск подсовывает нерелевантный фильм; и если этот же фильм
+         (тот же ID Кинопоиска) уже выбран в другой строке */
+      const cand = res[0];
+      const sameFilmTaken = state.rows.some(x => x.uid !== r.uid && x.movie && x.movie.kpId === cand.kpId);
+      if (res.length && similarEnough(r.title.trim(), cand.name) && !sameFilmTaken){
+        r.movie = cand; r.title = r.movie.name;
+        const input = el.querySelector('.title-input');
+        if (input) input.value = r.movie.name;
+        updateRowPicked(el, r);
+        found++;
+      }
+    }catch{}
+  }
+  save(); updateCount();
+  if (found) toast(`Из базы ПоискКино подтянуто постеров: ${found} из ${rows.length}`, 'ok');
+}
+
+/* ════════════════════════ ссылки на кинотеатры ════════════════════════ */
+/* Кнопки не ищут фильм на сайте: клик копирует название фильма в буфер
+   и открывает главную страницу кинотеатра — там пользователь сам вставляет Ctrl+V */
+function cinemaLinks(){
+  return [
+    ['kp', 'Кинопоиск', 'https://hd.kinopoisk.ru/'],
+    ['okko', 'Okko', 'https://okko.tv/'],
+    ['kion', 'KION', 'https://kion.ru/'],
+    ['kw', 'Kinopub', 'https://kino.watch/'],
+  ];
+}
+async function copyText(t){
+  try{ await navigator.clipboard.writeText(t); return true; }
+  catch{
+    try{
+      const ta = document.createElement('textarea');
+      ta.value = t; ta.style.cssText = 'position:fixed; top:0; opacity:0';
+      document.body.append(ta); ta.focus(); ta.select();
+      const ok = document.execCommand('copy');
+      ta.remove(); return ok;
+    }catch{ return false; }
+  }
+}
+/* клик по превью постера — открыть страницу фильма на Кинопоиске в новой вкладке;
+   window.open БЕЗ строки features — иначе браузер открывает окно/фолбэкится на ту же вкладку;
+   Ctrl/Shift-клик отдаём браузеру как есть */
+document.addEventListener('click', e => {
+  const t = e.target.closest('a.poster-thumb.linked');
+  if (!t || e.ctrlKey || e.metaKey || e.shiftKey) return;
+  e.preventDefault();
+  const w = window.open(t.href, '_blank');
+  if (w){ try{ w.opener = null; }catch{} }  /* безопасность без noopener */
+  else location.href = t.href;              /* строгие webview: переходим в той же вкладке */
+});
+
+/* клик по кнопке кинотеатра: сначала копируем название (пока страница в фокусе),
+   затем открываем главную страницу; Ctrl/Shift-клик отдаём браузеру как есть */
+document.addEventListener('click', async e => {
+  const a = e.target.closest('.link-btn');
+  if (!a) return;
+  const mod = e.ctrlKey || e.metaKey || e.shiftKey;
+  if (!mod) e.preventDefault();
+  const box = a.closest('.links');
+  const title = box ? box.dataset.title : '';
+  const ok = await copyText(title);
+  if (!mod){
+    const w = window.open(a.href, '_blank');
+    if (w){ try{ w.opener = null; }catch{} } else location.href = a.href;
+  }
+  toast(ok ? `«${title}» скопировано — вставьте в поиск на сайте (Ctrl+V)` : 'Не удалось скопировать название — скопируйте вручную', ok ? 'ok' : 'err');
+});
+function winnerPanel(m, eyebrow){
+  const meta = [m.movie && m.movie.year, m.movie && m.movie.kp && 'КП ' + m.movie.kp, m.movie && m.movie.imdb && 'IMDb ' + m.movie.imdb].filter(Boolean).join(' • ');
+  return `<div class="winner-card">
+    <img class="winner-poster" src="${esc(posterFor(m, true))}" alt="${esc(displayName(m))}">
+    <div class="winner-info">
+      <div class="eyebrow">${esc(eyebrow)}</div>
+      <h2>${esc(displayName(m))}</h2>
+      ${meta ? `<div class="wmeta">${esc(meta)}</div>` : ''}
+      <div class="links" data-title="${esc(displayName(m))}">${cinemaLinks().map(([cls,label,href]) =>
+        `<a class="link-btn ${cls}" href="${href}" target="_blank" rel="noopener">${label} ↗</a>`).join('')}
+      </div>
+      <div class="copy-hint">Название фильма копируется в буфер — на сайте кинотеатра вставьте его в поиск (Ctrl+V)</div>
+    </div>
+  </div>`;
+}
+function confetti(container){
+  const colors = ['#4da3ff','#7a5cff','#38d4ff','#ffd166','#ff6b9d','#2fd08a'];
+  for (let i=0;i<70;i++){
+    const p = document.createElement('div');
+    p.className = 'confetti-p';
+    const sz = 5 + Math.random()*7;
+    p.style.cssText = `left:${8+Math.random()*84}%; width:${sz}px; height:${sz*(0.5+Math.random())}px;`
+      + `background:${colors[i%colors.length]}; border-radius:${Math.random()<.4?'50%':'2px'};`
+      + `--x:${(Math.random()*2-1)*240}px; --r:${(Math.random()*720-360)|0}deg;`
+      + `--d:${(1+Math.random()*1.6).toFixed(2)}s; --dl:${(Math.random()*.35).toFixed(2)}s;`;
+    container.append(p);
+    setTimeout(() => p.remove(), 3600);
+  }
+}
+
+/* ════════════════════════ РУЛЕТКА (бесконечная зацикленная карусель) ════════════════════════ */
+const GAP = 12;
+const rou = { p:0, mode:'idle', cw:0, step:0, cycle:0, W:0, n:0, copies:0, raf:0, last:0, p0:0, p1:0, t0:0, dur:0, winnerIdx:null };
+let rouletteSig = '';
+const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function cardW(){ return Math.max(110, Math.min(170, Math.floor($('#carousel-wrap').clientWidth / 6.5))); }
+function carouselCard(m, cw){
+  return `<div class="c-card" data-uid="${m.uid}" style="--cw:${cw}px">
+    <img src="${esc(posterFor(m))}" loading="lazy" alt="" draggable="false">
+    <div class="c-name">${esc(displayName(m))}</div></div>`;
+}
+function emptyStateHTML(){
+  return `<div class="empty-state"><span class="ico">🍿</span>
+    Список пуст — добавьте фильмы в настройках.<br>
+    <button class="btn" data-goto="settings">Перейти в настройки</button></div>`;
+}
+
+/* лента из нескольких копий списка зациклена: позиция всегда берётся по модулю цикла,
+   поэтому у карусели нет ни начала, ни конца */
+function buildCarouselLoop(){
+  const ms = activeMovies(); if (!ms.length) return;
+  const cw = cardW(), step = cw + GAP, cycle = ms.length * step;
+  const W = $('#carousel-wrap').clientWidth;
+  let copies = Math.max(3, Math.ceil((W * 2) / cycle) + 1);
+  while (copies > 2 && copies * ms.length > 480) copies--;
+  rou.cw = cw; rou.step = step; rou.cycle = cycle; rou.W = W; rou.n = ms.length; rou.copies = copies;
+  $('#carousel-wrap').style.setProperty('--cw', cw + 'px');
+  const car = $('#carousel');
+  car.classList.remove('spinning');
+  car.innerHTML = '';
+  const one = ms.map(m => carouselCard(m, cw)).join('');
+  for (let c = 0; c < copies; c++) car.insertAdjacentHTML('beforeend', one);
+  if (rou.mode === 'stopped' && rou.winnerIdx != null){
+    let p = rou.winnerIdx * step;
+    while (p < 0) p += cycle;
+    rou.p = p;
+    const el = car.children[centeredSlot()];
+    if (el) el.classList.add('won');
+  } else if (rou.mode === 'spinning'){
+    rou.mode = 'idle';
+    rou.p = rou.p % rou.cycle;
+  } else {
+    rou.p = rou.p % rou.cycle;
+  }
+  applyStrip();
+}
+/* фаза ленты: 0 ≤ фаза < 2·цикла и всегда ≥ W/2 − cw/2,
+   чтобы лента выступала за левый край окна — пустых полей нет */
+function stripPhase(){
+  const base = rou.W/2 - rou.cw/2;
+  let ph = rou.p % rou.cycle;
+  if (ph < 0) ph += rou.cycle;
+  if (base - ph > 0) ph += rou.cycle;
+  return ph;
+}
+function applyStrip(){
+  $('#carousel').style.transform = `translateX(${rou.W/2 - rou.cw/2 - stripPhase()}px)`;
+}
+function centeredSlot(){ return Math.round(stripPhase() / rou.step); }
+function rouletteLoop(ts){
+  const dt = Math.min(60, ts - (rou.last || ts)); rou.last = ts;
+  if (rou.mode === 'idle' && !reducedMotion()){
+    rou.p += dt * 0.012;               /* лёгкий непрерывный дрейф — карусель живая */
+    applyStrip();
+  } else if (rou.mode === 'spinning'){
+    const t = Math.min(1, (ts - rou.t0) / rou.dur);
+    rou.p = rou.p0 + (rou.p1 - rou.p0) * (1 - Math.pow(1 - t, 4)); /* плавное торможение */
+    applyStrip();
+    if (t >= 1) finishSpin();
+  }
+  rou.raf = requestAnimationFrame(rouletteLoop);
+}
+function startLoop(){ if (!rou.raf){ rou.last = 0; rou.raf = requestAnimationFrame(rouletteLoop); } }
+function stopLoop(){ if (rou.raf){ cancelAnimationFrame(rou.raf); rou.raf = 0; } }
+
+function initRoulette(){
+  const ms = activeMovies();
+  const btn = $('#spin');
+  if (!ms.length){
+    rouletteSig = ''; rou.mode = 'idle'; rou.winnerIdx = null;
+    stopLoop();
+    $('#carousel').innerHTML = '';
+    $('#roulette-result').innerHTML = emptyStateHTML();
+    btn.disabled = true;
+    return;
+  }
+  btn.disabled = rou.mode === 'spinning';
+  const sig = ms.map(m => m.uid + (m.movie ? ':m' : '')).join(',');
+  if (sig !== rouletteSig || !$('#carousel').children.length){
+    rouletteSig = sig;
+    rou.winnerIdx = null; rou.mode = 'idle'; rou.p = 0;
+    buildCarouselLoop();
+  }
+  startLoop();
+}
+
+$('#spin').onclick = () => {
+  const ms = activeMovies();
+  if (!ms.length || rou.mode === 'spinning') return;
+  const n = rou.n;
+  if ($('#carousel').children.length !== rou.copies * n) buildCarouselLoop();
+  const btn = $('#spin');
+  btn.disabled = true; btn.textContent = 'Крутим…';
+  $('#roulette-result').innerHTML = '';
+  $('#carousel').querySelectorAll('.c-card.won').forEach(el => el.classList.remove('won'));
+
+  /* остановиться, когда в рамке — случайный фильм: слот j ≡ w (mod n), позиция кратна шагу */
+  const w = Math.floor(Math.random() * n);
+  const minDist = Math.max(rou.cycle * 3, rou.W * 2);
+  const k = Math.ceil((rou.p + minDist - w * rou.step) / rou.cycle);
+  rou.p0 = rou.p;
+  rou.p1 = (w + k * n) * rou.step;
+  rou.winnerIdx = w;
+  rou.mode = 'spinning';
+  rou.t0 = performance.now();
+  rou.dur = (reducedMotion() ? 1.2 : 4.4 + Math.random() * 0.8) * 1000;
+  $('#carousel').classList.add('spinning');
+};
+
+function finishSpin(){
+  rou.mode = 'stopped';
+  rou.p = rou.p1;
+  applyStrip();
+  const car = $('#carousel');
+  car.classList.remove('spinning');
+  const el = car.children[centeredSlot()];
+  if (el) el.classList.add('won');
+  const m = activeMovies()[rou.winnerIdx];
+  const res = $('#roulette-result');
+  res.innerHTML = winnerPanel(m, 'Выпал фильм · смотрим 🎉');
+  confetti(res);
+  const btn = $('#spin');
+  btn.disabled = false; btn.textContent = '🎯 Раскрутить ещё раз';
+}
+
+/* ════════════════════════ ГОЛОСОВАНИЕ ════════════════════════ */
+const vGrid = $('#voting-grid'), vWinner = $('#voting-winner'), vArea = $('#voting-area');
+const vNodes = new Map(); /* uid -> карточка */
+
+/* ↗ на карточке голосования: открыть КП в новой вкладке, НЕ исключая фильм.
+   Перехват на vGrid — чтобы клик по иконке не дошёл до обработчика исключения */
+vGrid.addEventListener('click', e => {
+  const o = e.target.closest('.v-open');
+  if (!o || !o.dataset.href) return;
+  e.stopPropagation();
+  const w = window.open(o.dataset.href, '_blank');
+  if (w){ try{ w.opener = null; }catch{} } else location.href = o.dataset.href;
+}, true);
+
+function votingRemainder(){
+  const elim = new Set(state.eliminated);
+  return activeMovies().filter(m => !elim.has(m.uid));
+}
+function vCardEl(m){
+  let el = vNodes.get(m.uid);
+  const sig = posterFor(m) + '|' + displayName(m) + '|' + (m.movie && m.movie.year || '') + '|' + (m.movie && m.movie.kpId || '');
+  if (!el){
+    el = document.createElement('button');
+    el.className = 'v-card'; el.dataset.uid = m.uid;
+    el.type = 'button';
+    el.title = `Убрать «${displayName(m)}»`;
+    el.onclick = () => eliminate(m.uid);
+    vNodes.set(m.uid, el);
+  }
+  /* метаданные могли подтянуться после создания карточки — обновляем постер и подпись */
+  if (el.dataset.sig !== sig){
+    el.dataset.sig = sig;
+    const year = m.movie && m.movie.year ? `<span class="v-year">${esc(m.movie.year)}</span>` : '';
+    el.innerHTML = `<img src="${esc(posterFor(m))}" loading="lazy" alt="" draggable="false">
+      <span class="v-title"><span class="v-name">${esc(displayName(m))}</span>${year}</span>
+      <span class="v-open" title="Открыть на Кинопоиске в новой вкладке">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#cfe3ff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M7 17L17 7M9 7h8v8"/></svg>
+      </span>`;
+    el.title = `Убрать «${displayName(m)}»`;
+  }
+  /* иконка ↗ активна только у фильмов, найденных в базе */
+  const open = el.querySelector('.v-open');
+  if (m.movie && m.movie.kpId){
+    open.dataset.href = 'https://www.kinopoisk.ru/film/' + m.movie.kpId + '/';
+    open.classList.add('has-link');
+  } else {
+    open.classList.remove('has-link');
+    delete open.dataset.href;
+  }
+  return el;
+}
+function eliminate(uid){
+  const el = vNodes.get(uid);
+  if (!el || el.classList.contains('out')) return;
+  el.classList.add('out');
+  setTimeout(() => {
+    state.eliminated.push(uid);
+    save();
+    layoutVoting();
+  }, 330);
+}
+function computeCols(n, W, H){
+  const GAPX = 14, AR = 1.5, MAXW = 460;
+  let fit = null, over = null;
+  const maxCols = Math.max(1, Math.floor((W + GAPX) / (64 + GAPX)));
+  for (let cols = 1; cols <= Math.min(n, maxCols); cols++){
+    const rows = Math.ceil(n/cols);
+    const cw = Math.min(MAXW, (W - (cols-1)*GAPX) / cols);
+    const needH = rows * cw * AR + (rows-1)*GAPX;
+    if (needH <= H){ if (!fit || cw > fit.cw) fit = {cols, cw}; }
+    else if (!over || needH < over.needH){ over = {cols, cw, needH}; }
+  }
+  return fit || over || {cols:n, cw:120};
+}
+function layoutVoting(instant=false){
+  const ms = activeMovies();
+  const undoBtn = $('#voting-undo');
+  if (!ms.length){
+    vGrid.style.display = 'none'; vGrid.innerHTML = '';
+    vWinner.innerHTML = emptyStateHTML();
+    $('#voting-count').textContent = '';
+    undoBtn.disabled = true;
+    return;
+  }
+  undoBtn.disabled = !state.eliminated.length;
+  const rem = votingRemainder();
+  $('#voting-count').textContent = rem.length ? `Осталось: ${rem.length} из ${ms.length}` : '';
+  const hints = {
+    0: 'Все фильмы убрали — нажмите «Вернуть» или «Заново».',
+    1: 'Победитель определён — смотрите ниже! 🎉',
+    2: 'Осталось два финалиста: уберите один — и оставшийся станет фильмом вечера.',
+  };
+  $('#voting-hint').textContent = hints[rem.length]
+    || (rem.length <= 4 ? 'Совсем немного осталось — обсуждайте и убирайте по одному.'
+      : 'Обсуждайте по очереди и убирайте фильмы, которые не готовы смотреть: один клик по постеру — фильма больше нет.');
+
+  if (rem.length === 0){ /* всё убрали — победителя нет */
+    vGrid.style.display = 'none';
+    vWinner.innerHTML = `<div class="v-final"><div><span style="font-size:40px;display:block;margin-bottom:10px">🙈</span>Убрали все фильмы.<br><button class="btn" id="v-final-reset" style="margin-top:14px">⟳ Начать заново</button></div></div>`;
+    $('#v-final-reset').onclick = resetVoting;
+    return;
+  }
+  if (rem.length === 1){
+    vGrid.style.display = 'none';
+    const m = rem[0];
+    vWinner.innerHTML = winnerPanel(m, 'Победитель голосования 🏆');
+    confetti(vWinner);
+    return;
+  }
+  vWinner.innerHTML = '';
+  vGrid.style.display = '';
+
+  /* FLIP: запоминаем позиции до перестройки */
+  const moving = rem.map(m => vCardEl(m)).filter(el => el.isConnected);
+  const before = new Map(moving.map(el => [el, el.getBoundingClientRect()]));
+
+  const rect = vArea.getBoundingClientRect();
+  const W = rect.width - 8, H = rect.height - 8;
+  const {cols, cw} = computeCols(rem.length, W, H);
+  vGrid.style.gridTemplateColumns = `repeat(${cols}, ${Math.floor(cw)}px)`;
+  vGrid.style.gap = '14px';
+  vGrid.innerHTML = '';
+  rem.forEach(m => vGrid.append(vCardEl(m)));
+
+  if (!instant && moving.length){
+    moving.forEach(el => {
+      const f = before.get(el), l = el.getBoundingClientRect();
+      const dx = f.left - l.left, dy = f.top - l.top, sx = f.width / Math.max(1, l.width);
+      if (Math.abs(dx) > .5 || Math.abs(dy) > .5 || Math.abs(sx-1) > .01){
+        el.style.transition = 'none';
+        el.style.transformOrigin = 'top left';
+        el.style.transform = `translate(${dx}px,${dy}px) scale(${sx})`;
+      }
+    });
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      moving.forEach(el => {
+        el.style.transition = 'transform .45s cubic-bezier(.22,.9,.26,1)';
+        el.style.transform = '';
+        setTimeout(() => { el.style.transition = ''; }, 480);
+      });
+    }));
+  }
+}
+$('#voting-undo').onclick = () => {
+  if (!state.eliminated.length) return;
+  const uidBack = state.eliminated.pop();
+  save();
+  const el = vNodes.get(uidBack);
+  if (el) el.classList.remove('out');
+  layoutVoting();
+};
+function resetVoting(){
+  state.eliminated = [];
+  vNodes.forEach(el => el.classList.remove('out'));
+  save();
+  layoutVoting(true);
+}
+$('#voting-reset').onclick = resetVoting;
+
+/* ════════════════════════ запуск ════════════════════════ */
+let resizeT = null;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeT);
+  resizeT = setTimeout(() => {
+    if ($('#view-roulette').classList.contains('active') && rou.mode !== 'spinning') buildCarouselLoop();
+    if ($('#view-voting').classList.contains('active')) layoutVoting(true);
+  }, 180);
+});
+
+load();
+keyInput.value = state.apiKey;
+renderRows();
+applyKeyUI();
+applyAiUI();
+showView('settings');
+loadEnv();
+</script>
+</body>
+</html>

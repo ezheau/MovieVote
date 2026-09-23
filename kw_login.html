@@ -1,0 +1,119 @@
+
+<!DOCTYPE html>
+<html lang="ru-RU">
+<head>
+    <meta charset="UTF-8"/>
+	<meta name="robots" content="noindex,nofollow" />
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimal-ui" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <link rel="preconnect" href="https://m.staticpop.net" crossorigin>
+    <link rel="dns-prefetch" href="https://m.staticpop.net">
+    <!-- for ios 7 style, multi-resolution icon of 152x152 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-barstyle" content="black-translucent">
+    <link rel="apple-touch-icon" href="https://m.staticpop.net/logo.png">
+    <meta name="apple-mobile-web-app-title" content="Flatkit">
+    <!-- for Chrome on Android, multi-resolution icon of 196x196 -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <link rel="shortcut icon" sizes="196x196" href="https://m.staticpop.net/logo.svg">
+  
+	<meta property="og:title" content="Авторизоваться" />
+	<meta property="og:site_name" content="Кинопаб"/>
+	<meta property="og:description" content="Фильмы / сериалы / подкасты на Apple TV, Android, Kodi/XBMC, Dune или Plex" />
+	<meta property="og:image" content="https://m.staticpop.net/logo.png" />
+    <meta name="csrf-param" content="_csrf">
+<meta name="csrf-token" content="ZJ95INx4A969UKj0OxIWuh_wCeELDeTa2C8laKff6wwvqCxWm0h35tMTycJadlffbbE60ls9nZm9Z1I8lIzaag==">
+    <title>Авторизоваться</title>
+    <link href="/assets/4c51cf6/authchoice.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<link href="/css/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="/css/styles/app.css" rel="stylesheet">
+<link href="/css/styles/style.css" rel="stylesheet"></head>
+<body>
+<style>
+    #app{
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+#app .footer-text{
+  margin-top: auto; /* толкает вниз */
+}
+    </style>
+<div class="app dark" id="app">
+    <div class="padding">
+        <div class="navbar">
+            <div class="pull-center">
+                <a href="/" class="navbar-brand md">
+                	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="32" height="32">
+                		<circle cx="24" cy="24" r="24" fill="rgba(255,255,255,0.2)"/>
+                		<circle cx="24" cy="24" r="22" fill="#1c202b" class="brand-color"/>
+                		<circle cx="24" cy="24" r="10" fill="#ffffff"/>
+                		<circle cx="13" cy="13" r="2"  fill="#ffffff" class="brand-animate"/>
+                		<path d="M 14 24 L 24 24 L 14 44 Z" fill="#FFFFFF" />
+                		<circle cx="24" cy="24" r="3" fill="#000000"/>
+                	</svg>
+                
+                	<img src="https://m.staticpop.net/logo.svg" alt="." class="hide">
+                	                        <span class="hidden-folded inline">kinopub</span>
+                                    </a>
+            </div>
+        </div>
+    </div>
+    <div class="b-t content">
+        <div class="center-block w-xxl w-auto-xs p-y-md text-center">
+            <div class="p-a-md">
+
+                
+
+    <div class="row">
+        <div class="col-xs-12">
+                    </div>
+    </div>
+
+    <h3>Авторизация</h3>
+<form id="login-form" action="/user/login" method="post">
+<input type="hidden" name="_csrf" value="ZJ95INx4A969UKj0OxIWuh_wCeELDeTa2C8laKff6wwvqCxWm0h35tMTycJadlffbbE60ls9nZm9Z1I8lIzaag=="><div class="form-group field-login-form-rememberme">
+
+<input type="hidden" id="login-form-rememberme" class="form-control" name="login-form[rememberMe]" value="1">
+
+<div class="help-block"></div>
+</div><div class="form-group field-login-form-login required">
+
+<input type="text" id="login-form-login" class="form-control" name="login-form[login]" autofocus="autofocus" tabindex="1" placeholder="Логин или email" aria-required="true">
+
+<div class="help-block"></div>
+</div>
+<div class="form-group field-login-form-password required">
+
+<input type="password" id="login-form-password" class="form-control" name="login-form[password]" tabindex="2" placeholder="Пароль" aria-required="true">
+
+<div class="help-block"></div>
+</div>
+<button type="submit" class="btn btn-success btn-block" tabindex="4">Войти</button>
+</form>
+    <p class="text-center" style="padding-top: 15px">
+        <a class="text-primary" href="/user/resend">Не пришло письмо?</a>        или
+        <a class="text-primary" href="/user/forgot">Забыли пароль?</a>    </p>
+    <p class="text-center">
+        <a class="btn btn-outline b-info text-info" href="/user/register">Нет аккаунта? Зарегистрируйтесь!</a>    </p>
+<div id="w0"><ul class="auth-clients"></ul></div>
+            </div>
+        </div>
+    </div>
+
+
+</div>
+
+
+
+<script src="/libs/jquery/dist/jquery.js"></script>
+<script src="/libs/tether/dist/js/tether.min.js"></script>
+<script src="/libs/bootstrap/dist/js/bootstrap.js"></script>
+<script src="/assets/674e0a6b/yii.js"></script>
+<script src="/assets/4c51cf6/authchoice.js"></script>
+<script>jQuery(function ($) {
+$('#w0').authchoice();
+});</script>
+</body>
+</html>

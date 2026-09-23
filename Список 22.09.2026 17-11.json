@@ -1,0 +1,147 @@
+{
+  "app": "movievote",
+  "version": 1,
+  "savedAt": "2026-09-22T14:11:47.540Z",
+  "rows": [
+    {
+      "title": "Иван Васильевич меняет профессию",
+      "movie": {
+        "kpId": 42664,
+        "name": "Иван Васильевич меняет профессию",
+        "altName": "Иван Васильевич меняет профессию",
+        "year": 1973,
+        "type": "фильм",
+        "kp": "8.8",
+        "imdb": "8.2",
+        "poster": "https://avatars.mds.yandex.net/get-kinopoisk-image/6201401/a7ef44b8-1983-4992-a889-da6f87a3f559/300x450",
+        "posterBig": "https://avatars.mds.yandex.net/get-kinopoisk-image/6201401/a7ef44b8-1983-4992-a889-da6f87a3f559/600x900"
+      }
+    },
+    {
+      "title": "Кавказская пленница, или Новые приключения Шурика",
+      "movie": {
+        "kpId": 44745,
+        "name": "Кавказская пленница, или Новые приключения Шурика",
+        "altName": "Кавказская пленница, или Новые приключения Шурика",
+        "year": 1966,
+        "type": "фильм",
+        "kp": "8.5",
+        "imdb": "8.2",
+        "poster": "https://avatars.mds.yandex.net/get-kinopoisk-image/4483445/d681bcf8-0fc2-4f2e-a772-0a01920e62b3/300x450",
+        "posterBig": "https://avatars.mds.yandex.net/get-kinopoisk-image/4483445/d681bcf8-0fc2-4f2e-a772-0a01920e62b3/600x900"
+      }
+    },
+    {
+      "title": "Бриллиантовая рука",
+      "movie": {
+        "kpId": 46225,
+        "name": "Бриллиантовая рука",
+        "altName": "Бриллиантовая рука",
+        "year": 1968,
+        "type": "фильм",
+        "kp": "8.6",
+        "imdb": "8.2",
+        "poster": "https://avatars.mds.yandex.net/get-kinopoisk-image/10893610/32ef92db-5cbb-426d-acf9-2327b695edf8/300x450",
+        "posterBig": "https://avatars.mds.yandex.net/get-kinopoisk-image/10893610/32ef92db-5cbb-426d-acf9-2327b695edf8/600x900"
+      }
+    },
+    {
+      "title": "Ирония судьбы",
+      "movie": {
+        "kpId": 56322,
+        "name": "Ирония судьбы",
+        "altName": "L'ironie du sort",
+        "year": 1974,
+        "type": "фильм",
+        "kp": "",
+        "imdb": "6.8",
+        "poster": "https://avatars.mds.yandex.net/get-kinopoisk-image/1900788/0a9d20d8-c95c-4a91-8b92-40540dbc9551/300x450",
+        "posterBig": "https://avatars.mds.yandex.net/get-kinopoisk-image/1900788/0a9d20d8-c95c-4a91-8b92-40540dbc9551/600x900"
+      }
+    },
+    {
+      "title": "Старикам тут не место",
+      "movie": {
+        "kpId": 195434,
+        "name": "Старикам тут не место",
+        "altName": "No Country for Old Men",
+        "year": 2007,
+        "type": "фильм",
+        "kp": "7.8",
+        "imdb": "8.2",
+        "poster": "https://avatars.mds.yandex.net/get-kinopoisk-image/10703959/e929aed3-f4bd-469b-b6fe-f4e86c8f4e21/300x450",
+        "posterBig": "https://avatars.mds.yandex.net/get-kinopoisk-image/10703959/e929aed3-f4bd-469b-b6fe-f4e86c8f4e21/600x900"
+      }
+    },
+    {
+      "title": "Трудности перевода",
+      "movie": {
+        "kpId": 5930,
+        "name": "Трудности перевода",
+        "altName": "Lost in Translation",
+        "year": 2003,
+        "type": "фильм",
+        "kp": "7.2",
+        "imdb": "7.7",
+        "poster": "https://avatars.mds.yandex.net/get-kinopoisk-image/1629390/f3244f35-75a5-41a1-94a5-e07980c54e1e/300x450",
+        "posterBig": "https://avatars.mds.yandex.net/get-kinopoisk-image/1629390/f3244f35-75a5-41a1-94a5-e07980c54e1e/600x900"
+      }
+    },
+    {
+      "title": "Греческая смоковница",
+      "movie": {
+        "kpId": 70978,
+        "name": "Греческая смоковница",
+        "altName": "Griechische Feigen",
+        "year": 1976,
+        "type": "фильм",
+        "kp": "6.1",
+        "imdb": "5.4",
+        "poster": "https://avatars.mds.yandex.net/get-kinopoisk-image/1777765/11c88ee7-397c-421b-94a9-7bccb312a271/300x450",
+        "posterBig": "https://avatars.mds.yandex.net/get-kinopoisk-image/1777765/11c88ee7-397c-421b-94a9-7bccb312a271/600x900"
+      }
+    },
+    {
+      "title": "Эффект бабочки",
+      "movie": {
+        "kpId": 5167,
+        "name": "Эффект бабочки",
+        "altName": "The Butterfly Effect",
+        "year": 2003,
+        "type": "фильм",
+        "kp": "8.2",
+        "imdb": "7.6",
+        "poster": "https://avatars.mds.yandex.net/get-kinopoisk-image/1629390/9cc3a3d5-d6fe-4f41-a22f-05cdff66e968/300x450",
+        "posterBig": "https://avatars.mds.yandex.net/get-kinopoisk-image/1629390/9cc3a3d5-d6fe-4f41-a22f-05cdff66e968/600x900"
+      }
+    },
+    {
+      "title": "Афоня",
+      "movie": {
+        "kpId": 43423,
+        "name": "Афоня",
+        "altName": "Афоня",
+        "year": 1975,
+        "type": "фильм",
+        "kp": "8.2",
+        "imdb": "7.7",
+        "poster": "https://avatars.mds.yandex.net/get-kinopoisk-image/4774061/908f8e1a-0a4d-4f2b-9725-228ce96f0c62/300x450",
+        "posterBig": "https://avatars.mds.yandex.net/get-kinopoisk-image/4774061/908f8e1a-0a4d-4f2b-9725-228ce96f0c62/600x900"
+      }
+    },
+    {
+      "title": "Мимино",
+      "movie": {
+        "kpId": 46638,
+        "name": "Мимино",
+        "altName": "Мимино",
+        "year": 1977,
+        "type": "фильм",
+        "kp": "8.3",
+        "imdb": "8.0",
+        "poster": "https://avatars.mds.yandex.net/get-kinopoisk-image/4486454/a0a82a7d-4354-4aae-baef-3acbe0c0a487/300x450",
+        "posterBig": "https://avatars.mds.yandex.net/get-kinopoisk-image/4486454/a0a82a7d-4354-4aae-baef-3acbe0c0a487/600x900"
+      }
+    }
+  ]
+}
