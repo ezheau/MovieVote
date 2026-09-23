@@ -470,9 +470,7 @@
 
       <div class="list-side">
         <div class="panel list-panel">
-          <h2 style="display:flex; align-items:center; gap:8px">Фильмы <span class="count-chip" id="movie-count"></span>
-            <button class="btn ghost" id="fetch-meta" title="Найти фильмы в базе ПоискКино: постеры, годы, рейтинги и страницы Кинопоиска (~1 запрос на фильм)">🔗 Подтянуть постеры</button>
-          </h2>
+          <h2 style="display:flex; align-items:center">Фильмы <span class="count-chip" id="movie-count"></span></h2>
           <div id="movie-rows"></div>
           <button class="btn ghost" id="add-row">＋ Добавить фильм</button>
         </div>
@@ -481,6 +479,7 @@
           <div style="display:flex; gap:10px; flex-wrap:wrap">
             <button class="btn ghost" id="save-list">💾 Сохранить список</button>
             <button class="btn ghost danger" id="clear-list">🗑 Очистить список</button>
+            <button class="btn ghost" id="fetch-meta" title="Найти фильмы в базе ПоискКино: постеры, годы, рейтинги и страницы Кинопоиска">🔗 Подтянуть постеры</button>
           </div>
           <button class="btn big" id="go-main">К выбору фильма →</button>
         </div>
@@ -532,6 +531,17 @@
     <div class="modal-actions">
       <button class="btn ghost" id="confirm-no">Отменить</button>
       <button class="btn danger-solid" id="confirm-yes">Очистить</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="fetch-modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="fetch-title">
+    <h3 id="fetch-title">Подтянуть постеры из базы?</h3>
+    <p id="fetch-text"></p>
+    <div class="modal-actions">
+      <button class="btn ghost" id="fetch-cancel">Отменить</button>
+      <button class="btn" id="fetch-confirm">Подтянуть</button>
     </div>
   </div>
 </div>
@@ -620,6 +630,11 @@ function posterFor(m, big=false){
   if (mv){ if (big && mv.posterBig) return mv.posterBig; if (mv.poster) return mv.poster; }
   return placeholderPoster(displayName(m), mv && mv.year);
 }
+/* строка «год • тип • страна • рейтинги» для списков и выпадашки */
+function metaLine(m){
+  return [m.year, m.type, m.countries, m.kp && 'КП ' + m.kp, m.imdb && 'IMDb ' + m.imdb]
+    .filter(Boolean).join(' • ');
+}
 
 /* ════════════════════════ API ПоискКино (poiskkino.dev) ════════════════════════ */
 const PK_API = 'https://api.poiskkino.dev';
@@ -650,6 +665,7 @@ async function pkSearch(q){
     altName: m.alternativeName || '',
     year: m.year || (m.releaseYears && m.releaseYears[0]) || '',
     type: TYPE_RU[m.type] || m.type || '',
+    countries: (m.countries || []).map(c => c.name || c.country || '').filter(Boolean).slice(0, 3).join(', '),
     kp: m.rating && m.rating.kp ? (+m.rating.kp).toFixed(1) : '',
     imdb: m.rating && m.rating.imdb ? (+m.rating.imdb).toFixed(1) : '',
     poster: (m.poster && (m.poster.previewUrl || m.poster.url)) || '',
@@ -701,12 +717,7 @@ function updateRowPicked(rowEl, r){
     ? `<img src="${esc(r.movie.poster || placeholderPoster(r.movie.name, r.movie.year))}" alt="">`
     : '🎬';
   const meta = rowEl.querySelector('.title-meta');
-  if (r.movie){
-    meta.textContent = [r.movie.year, r.movie.type,
-      r.movie.kp && 'КП ' + r.movie.kp, r.movie.imdb && 'IMDb ' + r.movie.imdb].filter(Boolean).join(' • ');
-  } else {
-    meta.textContent = '';
-  }
+  meta.textContent = r.movie ? metaLine(r.movie) : '';
   if (r.movie && r.movie.kpId){
     thumb.classList.add('linked');
     thumb.href = 'https://www.kinopoisk.ru/film/' + r.movie.kpId + '/';
@@ -834,14 +845,13 @@ function makeRow(r){
         return;
       }
       showSuggest(dd, res.map((m, i) => {
-        const meta = [m.year, m.type, m.kp && 'КП ' + m.kp, m.imdb && 'IMDb ' + m.imdb].filter(Boolean).join(' • ');
         const img = m.poster ? `<img src="${esc(m.poster)}" alt="">` : `<div class="ph">🎬</div>`;
         const open = m.kpId
           ? `<span class="s-open" data-href="https://www.kinopoisk.ru/film/${m.kpId}/" title="Открыть на Кинопоиске в новой вкладке — список не закроется">
                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#9fd8ff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M7 17L17 7M9 7h8v8"/></svg>
              </span>`
           : '';
-        return `<div class="s-item" data-i="${i}">${img}<div><div class="s-name">${esc(m.name)}</div><div class="s-meta">${esc(meta)}${m.altName && m.altName!==m.name ? ' · ' + esc(m.altName) : ''}</div></div>${open}</div>`;
+        return `<div class="s-item" data-i="${i}">${img}<div><div class="s-name">${esc(m.name)}</div><div class="s-meta">${esc(metaLine(m))}${m.altName && m.altName!==m.name ? ' · ' + esc(m.altName) : ''}</div></div>${open}</div>`;
       }).join(''));
       dd.querySelectorAll('.s-item').forEach(item => {
         const openBtn = item.querySelector('.s-open');
@@ -919,21 +929,40 @@ rowsEl.addEventListener('dragover', e => {
 document.addEventListener('pointerup', () => $$('#movie-rows .mrow').forEach(el => el.draggable = false));
 
 $('#add-row').onclick = () => addRow(true);
-$('#fetch-meta').onclick = async () => {
-  const targets = state.rows.filter(r => r.title.trim() && !r.movie);
+/* ───────── подтягивание постеров с подтверждением ───────── */
+const fetchModal = $('#fetch-modal'), fetchText = $('#fetch-text');
+let fetchTargets = [];
+$('#fetch-meta').onclick = () => {
+  const targets = state.rows.filter(r => r.title.trim() && (!r.movie || !r.movie.countries));
   if (!targets.length){ toast('Все фильмы уже связаны с базой', 'info'); return; }
   if (!state.apiKey){ toast('Сначала укажите ключ ПоискКино', 'err'); return; }
+  fetchTargets = targets;
+  const n = targets.length;
+  const m10 = n % 10, m100 = n % 100;
+  const reqWord = (m10 === 1 && m100 !== 11) ? 'запрос' : (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) ? 'запроса' : 'запросов';
+  $('#fetch-text').textContent =
+    `Фильмов для обновления: ${n}. Будет потрачено примерно ${n} ${reqWord} из суточного лимита базы (200 в сутки) — `
+    + `найдём постеры, страны, годы, рейтинги и страницы Кинопоиска.`;
+  fetchModal.hidden = false;
+  $('#fetch-confirm').focus();
+};
+const closeFetchModal = () => { fetchModal.hidden = true; };
+$('#fetch-cancel').onclick = closeFetchModal;
+fetchModal.addEventListener('click', e => { if (e.target === fetchModal) closeFetchModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !fetchModal.hidden) closeFetchModal(); });
+$('#fetch-confirm').onclick = async () => {
+  const targets = fetchTargets;
+  closeFetchModal();
+  if (!targets.length) return;
   const btn = $('#fetch-meta');
   btn.disabled = true;
-  toast(`Ищем в базе: ${targets.length} из ${activeMovies().length} (≈${targets.length} запросов)`);
   await backgroundSearch(targets);
   btn.disabled = false;
 };
 $('#go-main').onclick = () => showView(activeMovies().length ? 'voting' : 'settings');
 
 /* ───────── очистка списка с подтверждением ───────── */
-const confirmModal = $('#confirm-modal');
-$('#clear-list').onclick = () => { confirmModal.hidden = false; $('#confirm-yes').focus(); };
+const confirmModal = $('#confirm-modal');$('#clear-list').onclick = () => { confirmModal.hidden = false; $('#confirm-yes').focus(); };
 const closeConfirm = () => { confirmModal.hidden = true; };
 $('#confirm-no').onclick = closeConfirm;
 confirmModal.addEventListener('click', e => { if (e.target === confirmModal) closeConfirm(); });
@@ -1348,8 +1377,10 @@ function importTitles(titles){
   });
   addRow();
   updateCount();
-  toast(`Добавлено фильмов: ${added.length}`, 'ok');
-  backgroundSearch(added);
+  /* к базе сразу не обращаемся — лимит тратится только по кнопке «Подтянуть постеры» */
+  toast(state.apiKey
+    ? `Добавлено фильмов: ${added.length}. Нажмите «🔗 Подтянуть постеры», чтобы найти их в базе (≈${added.length} запросов)`
+    : `Добавлено фильмов: ${added.length}`, 'ok');
 }
 
 /* автоподбор варианта из базы для списка, загруженного файлом */
@@ -1366,9 +1397,19 @@ async function backgroundSearch(rows){
   for (const r of rows){
     await sleep(160);
     const el = rowsEl.querySelector(`.mrow[data-uid="${r.uid}"]`);
-    if (!el || r.movie || !r.title.trim()) continue;
+    if (!el || !r.title.trim()) continue;
     try{
       const res = await pkSearch(r.title.trim());
+      /* у строки уже есть фильм из базы — добираем недостающее (страну) по его ID */
+      if (r.movie){
+        const same = res.find(x => x.kpId === r.movie.kpId);
+        if (same && !r.movie.countries && same.countries){
+          r.movie.countries = same.countries;
+          updateRowPicked(el, r);
+          found++;
+        }
+        continue;
+      }
       if (r.movie) continue; /* пользователь успел выбрать сам */
       /* берём результат, только если он действительно похож на запрос,
          иначе фаззи-поиск подсовывает нерелевантный фильм; и если этот же фильм
@@ -1440,7 +1481,7 @@ document.addEventListener('click', async e => {
   toast(ok ? `«${title}» скопировано — вставьте в поиск на сайте (Ctrl+V)` : 'Не удалось скопировать название — скопируйте вручную', ok ? 'ok' : 'err');
 });
 function winnerPanel(m, eyebrow){
-  const meta = [m.movie && m.movie.year, m.movie && m.movie.kp && 'КП ' + m.movie.kp, m.movie && m.movie.imdb && 'IMDb ' + m.movie.imdb].filter(Boolean).join(' • ');
+  const meta = m.movie ? metaLine(m.movie) : '';
   return `<div class="winner-card">
     <img class="winner-poster" src="${esc(posterFor(m, true))}" alt="${esc(displayName(m))}">
     <div class="winner-info">
