@@ -142,12 +142,9 @@
 
   /* ───────── ИИ-подбор ───────── */
   .ai-panel{margin-bottom:16px}
-  .ai-cfg{display:grid; grid-template-columns:minmax(130px,180px) 1fr minmax(150px,220px); gap:8px; margin-bottom:10px}
-  .ai-cfg select, .ai-row select{
-    background:rgba(4,10,35,.55); border:1px solid rgba(140,175,255,.25); border-radius:10px;
-    padding:10px 12px; color:var(--text); font-size:14px; font-family:inherit;
-  }
-  .ai-cfg input{
+  .ai-cfg{display:flex; flex-direction:column; gap:10px; margin-bottom:10px}
+  .ai-cfg select, .ai-cfg input, .ai-row select{
+    width:100%; box-sizing:border-box;
     background:rgba(4,10,35,.55); border:1px solid rgba(140,175,255,.25); border-radius:10px;
     padding:10px 12px; color:var(--text); font-size:14px; font-family:inherit; min-width:0;
   }
@@ -165,7 +162,6 @@
   .ai-row input[type=number]:focus{outline:none; border-color:var(--cyan)}
   .ai-row .btn{margin-left:auto}
   #ai-check{margin-left:0}
-  @media (max-width:760px){ .ai-cfg{grid-template-columns:1fr} }
   #movie-rows{display:flex; flex-direction:column; gap:9px; margin-bottom:12px}
   .mrow{
     display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:14px;
@@ -479,11 +475,13 @@
           <div class="ai-cfg">
             <select id="ai-provider" title="Провайдер ИИ">
               <option value="zai">Z.ai (GLM)</option>
+              <option value="anthropic">Claude (Anthropic)</option>
               <option value="openai">OpenAI</option>
               <option value="deepseek">DeepSeek</option>
               <option value="custom">Другой (OpenAI-совместимый)</option>
             </select>
-            <input id="ai-model" placeholder="Модель" spellcheck="false">
+            <input id="ai-model" list="ai-model-list" placeholder="Модель" spellcheck="false" autocomplete="off">
+            <datalist id="ai-model-list"></datalist>
             <input id="ai-url" placeholder="https://api.example.com/v1/chat/completions" spellcheck="false" hidden>
             <input id="ai-key" type="password" placeholder="AI API-ключ" autocomplete="off" spellcheck="false">
           </div>
@@ -1155,22 +1153,45 @@ $('#env-reload').onclick = async () => { await loadEnv(); };
 
 /* ════════════════════════ ИИ-подбор фильмов ════════════════════════ */
 const AI_PROVIDERS = {
-  zai:     { url:'https://api.z.ai/api/paas/v4/chat/completions', model:'glm-4.5-flash' },
-  openai:  { url:'https://api.openai.com/v1/chat/completions',     model:'gpt-4o-mini' },
-  deepseek:{ url:'https://api.deepseek.com/chat/completions',      model:'deepseek-chat' },
-  custom:  { url:'', model:'' },
+  zai:       { url:'https://api.z.ai/api/paas/v4/chat/completions', model:'glm-4.5-flash', models:'https://api.z.ai/api/paas/v4/models' },
+  anthropic: { url:'https://api.anthropic.com/v1/messages',          model:'claude-sonnet-4-5', models:'https://api.anthropic.com/v1/models' },
+  openai:    { url:'https://api.openai.com/v1/chat/completions',     model:'gpt-4o-mini',       models:'https://api.openai.com/v1/models' },
+  deepseek:  { url:'https://api.deepseek.com/chat/completions',      model:'deepseek-chat',     models:'https://api.deepseek.com/models' },
+  custom:    { url:'', model:'' },
 };
+const MODEL_LISTS = {};   /* провайдер -> [id моделей], кэш на сессию */
 const aiProvSel = $('#ai-provider'), aiModelInp = $('#ai-model'), aiUrlInp = $('#ai-url'), aiKeyInp = $('#ai-key');
 function applyAiUI(){
   const p = state.ai.provider || 'zai';
   aiProvSel.value = p;
-  aiModelInp.value = state.ai.model || '';
+  aiModelInp.value = state.ai.model || AI_PROVIDERS[p].model || '';
   aiModelInp.placeholder = AI_PROVIDERS[p].model || 'Модель';
   aiUrlInp.hidden = p !== 'custom';
   aiUrlInp.value = state.ai.url || '';
   aiKeyInp.value = state.ai.key || '';
+  fillModelDatalist(MODEL_LISTS[p]);
 }
-aiProvSel.addEventListener('change', () => { state.ai.provider = aiProvSel.value; state.ai.model = ''; save(); applyAiUI(); });
+function fillModelDatalist(ids){
+  const dl = $('#ai-model-list');
+  dl.innerHTML = (ids || []).map(id => `<option value="${esc(id)}">`).join('');
+}
+/* подтянуть список моделей сервиса по ключу (через локальный прокси) */
+async function aiFetchModels(){
+  const ai = state.ai;
+  const prov = AI_PROVIDERS[ai.provider];
+  if (!prov || !prov.models || !ai.key) return;
+  const headers = ai.provider === 'anthropic'
+    ? { 'x-api-key': ai.key, 'anthropic-version':'2023-06-01' }
+    : { 'Authorization':'Bearer ' + ai.key };
+  try{
+    const r = await fetch('/ai-proxy/models?provider=' + encodeURIComponent(ai.provider), { headers });
+    if (!r.ok) return;
+    const d = await r.json();
+    MODEL_LISTS[ai.provider] = (d.data || []).map(m => m.id || m.name).filter(Boolean).sort();
+    if (ai.provider === state.ai.provider) fillModelDatalist(MODEL_LISTS[ai.provider]);
+  }catch{}   /* без списка поле остаётся обычным вводом */
+}
+aiProvSel.addEventListener('change', () => { state.ai.provider = aiProvSel.value; state.ai.model = ''; save(); applyAiUI(); aiFetchModels(); });
 [aiModelInp, aiUrlInp, aiKeyInp].forEach(inp => inp.addEventListener('input', () => {
   state.ai.model = aiModelInp.value.trim();
   state.ai.url = aiUrlInp.value.trim();
@@ -1187,15 +1208,23 @@ async function aiPing(){
     return !!j.proxy;
   }catch{ return false; }
 }
-async function aiSend(payload, opts = {}){
+async function aiComplete(usr, n, check){
   const ai = state.ai;
   const prov = AI_PROVIDERS[ai.provider] || AI_PROVIDERS.custom;
   const url = ai.provider === 'custom' ? ai.url.trim() : prov.url;
   const model = ai.model || prov.model;
   if (!ai.key) throw new Error('Введите AI API-ключ');
   if (!url) throw new Error('Укажите адрес API (поле ссылки)');
-  const headers = {'Content-Type':'application/json', 'Authorization':'Bearer ' + ai.key};
-  const body = JSON.stringify(Object.assign({ model }, payload));
+  const sys = 'Ты — кинокуратор для компании, выбирающей фильм на вечер. По описанию пользователя верни ТОЛЬКО строгий JSON вида {"titles":["Название 1","Название 2",...]} — ровно '
+    + n + ' подходящих полнометражных фильмов. Названия на русском, как на Кинопоиске, без года, кавычек и пояснений.'
+    + (activeMovies().length ? ' Не повторяй уже имеющиеся фильмы: ' + activeMovies().map(displayName).join(', ') + '.' : '');
+  const isClaude = ai.provider === 'anthropic';
+  const headers = isClaude
+    ? { 'Content-Type':'application/json', 'x-api-key': ai.key, 'anthropic-version':'2023-06-01' }
+    : { 'Content-Type':'application/json', 'Authorization':'Bearer ' + ai.key };
+  const body = isClaude
+    ? { model, max_tokens: check ? 512 : 1600, system: sys, messages:[{ role:"user", content: usr }] }
+    : { model, temperature: 0.8, messages:[{ role:"system", content: sys }, { role:"user", content: usr }] };
 
   async function parse(r){
     if (!r.ok){
@@ -1204,47 +1233,25 @@ async function aiSend(payload, opts = {}){
       throw new Error(msg);
     }
     const d = await r.json();
-    const content = d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content;
-    if (!content){
-      /* у рассуждающих моделей (GLM) токены могут уйти в reasoning_content —
-         для проверки ключа этого достаточно */
-      if (opts.allowEmpty && d.choices && d.choices[0]) return '';
-      throw new Error('Пустой ответ модели');
-    }
+    let content = '';
+    if (isClaude) content = (d.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+    else content = d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content || '';
+    if (!content){ if (check) return ''; throw new Error('Пустой ответ модели'); }
     return content;
   }
   async function viaProxy(){
-    const r = await fetch('/ai-proxy/custom?target=' + encodeURIComponent(url), { method:'POST', headers, body });
+    const r = await fetch('/ai-proxy/custom?target=' + encodeURIComponent(url), { method:'POST', headers, body: JSON.stringify(body) });
     return parse(r);
   }
-
-  /* если поднят server.py — сразу через его прокси (нет CORS и сетевых блокировок) */
   if (aiViaProxy === null) aiViaProxy = await aiPing();
   if (aiViaProxy) return viaProxy();
-
   try{
-    const r = await fetch(url, { method:'POST', headers, body });
+    const r = await fetch(url, { method:'POST', headers, body: JSON.stringify(body) });
     return await parse(r);
   }catch(err){
-    /* «Failed to fetch»: CORS или недоступен хост — пробуем через локальный прокси */
-    if (!(await aiPing())){
-      throw new Error('Не удалось связаться с ' + (new URL(url).host)
-        + '. Запустите python server.py (вместо python -m http.server) и обновите страницу, либо проверьте сеть/VPN.');
-    }
+    if (!(await aiPing())) throw new Error('Не удалось связаться с ' + new URL(url).host + '. Запустите python server.py (вместо python -m http.server) и обновите страницу, либо проверьте сеть/VPN.');
     return viaProxy();
   }
-}
-async function aiChat(prompt, n){
-  return aiSend({
-    temperature: 0.8,
-    messages:[
-      { role:'system', content:
-        'Ты — кинокуратор для компании, выбирающей фильм на вечер. По описанию пользователя верни ТОЛЬКО строгий JSON вида {"titles":["Название 1","Название 2",...]} — ровно '
-        + n + ' подходящих полнометражных фильмов. Названия на русском, как на Кинопоиске, без года, кавычек и пояснений.'
-        + (activeMovies().length ? ' Не повторяй уже имеющиеся фильмы: ' + activeMovies().map(displayName).join(', ') + '.' : '') },
-      { role:'user', content: prompt },
-    ],
-  });
 }
 $('#ai-check').onclick = async () => {
   const st = $('#ai-status'), btn = $('#ai-check');
@@ -1252,7 +1259,7 @@ $('#ai-check').onclick = async () => {
   st.className = 'api-status'; st.textContent = 'Проверяем ключ…';
   const t0 = Date.now();
   try{
-    await aiSend({ max_tokens: 512, messages:[{ role:'user', content:'Ответь ровно одним словом: ОК' }] }, { allowEmpty:true });
+    await aiComplete('Ответь ровно одним словом: ОК', 1, true);
     const model = state.ai.model || (AI_PROVIDERS[state.ai.provider] || {}).model || '';
     st.className = 'api-status ok';
     st.textContent = `✔ Ключ принят, модель работает${model ? ' (' + model + ')' : ''} — ответила за ${Math.round((Date.now()-t0)/1000)} с.`;
@@ -1288,7 +1295,7 @@ $('#ai-go').onclick = async () => {
   btn.disabled = true;
   st.className = 'api-status'; st.textContent = '🤔 ИИ подбирает фильмы…';
   try{
-    const content = await aiChat(q, n);
+    const content = await aiComplete(q, n, false);
     const titles = [...new Set(parseAiTitles(content))].slice(0, n).map(t => t.trim()).filter(Boolean);
     if (!titles.length) throw new Error('Не удалось понять ответ модели — попробуйте ещё раз');
     importTitles(titles);

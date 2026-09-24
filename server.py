@@ -26,12 +26,21 @@ ROOT = Path(__file__).resolve().parent
 
 PROVIDERS = {
     'zai': 'https://api.z.ai/api/paas/v4/chat/completions',
+    'anthropic': 'https://api.anthropic.com/v1/messages',
     'openai': 'https://api.openai.com/v1/chat/completions',
     'deepseek': 'https://api.deepseek.com/chat/completions',
 }
 # во внешний мир — только эти хосты (localhost — для тестов)
-ALLOWED = {'api.z.ai', 'api.openai.com', 'api.deepseek.com'}
+ALLOWED = {'api.z.ai', 'api.anthropic.com', 'api.openai.com', 'api.deepseek.com'}
 LOCAL = {'127.0.0.1', 'localhost', '::1'}
+
+# GET-списки моделей провайдеров
+MODELS_URLS = {
+    'zai': 'https://api.z.ai/api/paas/v4/models',
+    'anthropic': 'https://api.anthropic.com/v1/models',
+    'openai': 'https://api.openai.com/v1/models',
+    'deepseek': 'https://api.deepseek.com/models',
+}
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -54,8 +63,29 @@ class Handler(SimpleHTTPRequestHandler):
 
     # ── пинг прокси ──
     def do_GET(self):
-        if self.path.split('?')[0] == '/ai-proxy/ping':
+        path, _, query = self.path.partition('?')
+        if path == '/ai-proxy/ping':
             self._json(200, {'proxy': True})
+            return
+        if path == '/ai-proxy/models':
+            slug = (parse_qs(query).get('provider') or [''])[0]
+            target = MODELS_URLS.get(slug)
+            if not target:
+                self._json(404, {'error': {'message': 'Неизвестный провайдер: ' + slug}})
+                return
+            headers = {}
+            for h in ('Authorization', 'x-api-key', 'anthropic-version'):
+                if self.headers.get(h):
+                    headers[h] = self.headers.get(h)
+            try:
+                req = urllib.request.Request(target, headers=headers, method='GET')
+                with urllib.request.urlopen(req, timeout=30) as up:
+                    self._raw(up.status, up.read(), 'application/json')
+            except urllib.error.HTTPError as e:
+                ctype = e.headers.get('Content-Type', 'application/json') if e.headers else 'application/json'
+                self._raw(e.code, e.read(), ctype)
+            except Exception as e:
+                self._json(502, {'error': {'message': f'Нет связи с провайдером: {e}. Проверьте сеть/VPN.'}})
             return
         super().do_GET()
 
@@ -83,9 +113,9 @@ class Handler(SimpleHTTPRequestHandler):
         length = int(self.headers.get('Content-Length') or 0)
         data = self.rfile.read(length) if length else b''
         headers = {'Content-Type': self.headers.get('Content-Type', 'application/json')}
-        auth = self.headers.get('Authorization')
-        if auth:
-            headers['Authorization'] = auth
+        for h in ('Authorization', 'x-api-key', 'anthropic-version'):
+            if self.headers.get(h):
+                headers[h] = self.headers.get(h)
 
         req = urllib.request.Request(target, data=data, headers=headers, method='POST')
         try:
