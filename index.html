@@ -143,6 +143,10 @@
   /* ───────── ИИ-подбор ───────── */
   .ai-panel{margin-bottom:16px}
   .ai-cfg{display:flex; flex-direction:column; gap:10px; margin-bottom:10px}
+  .ai-field{display:flex; flex-direction:column; gap:5px}
+  .ai-field[hidden]{display:none} /* явный display выше перебивает атрибут hidden */
+  .ai-field > span{font-size:12px; color:var(--muted); padding-left:2px}
+  .ai-row-label{font-size:12px; color:var(--muted); white-space:nowrap}
   .ai-cfg select, .ai-cfg input, .ai-row select{
     width:100%; box-sizing:border-box;
     background:rgba(4,10,35,.55); border:1px solid rgba(140,175,255,.25); border-radius:10px;
@@ -151,7 +155,7 @@
   .ai-cfg input:focus, .ai-cfg select:focus, .ai-row select:focus{outline:none; border-color:var(--cyan)}
   .ai-panel textarea{
     width:100%; background:rgba(4,10,35,.5); border:1px solid rgba(140,175,255,.22); border-radius:10px;
-    padding:11px 13px; color:var(--text); font-size:15px; font-family:inherit; resize:vertical; min-height:56px;
+    padding:11px 13px; color:var(--text); font-size:15px; font-family:inherit; resize:vertical; min-height:96px;
   }
   .ai-panel textarea:focus{outline:none; border-color:var(--cyan); box-shadow:0 0 0 3px rgba(56,212,255,.15)}
   .ai-row{display:flex; gap:10px; margin-top:10px; align-items:center}
@@ -444,7 +448,7 @@
               <a href="https://t.me/poiskkinodev_bot" target="_blank" rel="noopener">@poiskkinodev_bot</a> — вставьте его сюда:
             </p>
             <div class="key-row">
-              <input id="api-key" type="password" placeholder="API-ключ (токен) ПоискКино" autocomplete="off" spellcheck="false">
+              <input id="api-key" type="password" placeholder="API-ключ (токен) ПоискКино" autocomplete="new-password" spellcheck="false">
               <button class="btn ghost" id="api-check">Проверить</button>
             </div>
             <div class="api-status" id="api-status">Демо-режим: без ключа постеры будут заглушками.</div>
@@ -473,21 +477,32 @@
             ИИ предложит названия, и они сразу появятся в списке справа с постерами.
           </p>
           <div class="ai-cfg">
-            <select id="ai-provider" title="Провайдер ИИ">
-              <option value="zai">Z.ai (GLM)</option>
-              <option value="anthropic">Claude (Anthropic)</option>
-              <option value="openai">OpenAI</option>
-              <option value="deepseek">DeepSeek</option>
-              <option value="custom">Другой (OpenAI-совместимый)</option>
-            </select>
-            <input id="ai-model" list="ai-model-list" placeholder="Модель" spellcheck="false" autocomplete="off">
-            <datalist id="ai-model-list"></datalist>
-            <input id="ai-url" placeholder="https://api.example.com/v1/chat/completions" spellcheck="false" hidden>
-            <input id="ai-key" type="password" placeholder="AI API-ключ" autocomplete="off" spellcheck="false">
+            <label class="ai-field"><span>Провайдер</span>
+              <select id="ai-provider" title="Провайдер ИИ">
+                <option value="zai">Z.ai (GLM)</option>
+                <option value="anthropic">Claude (Anthropic)</option>
+                <option value="openai">OpenAI</option>
+                <option value="deepseek">DeepSeek</option>
+                <option value="custom">Другой (OpenAI-совместимый)</option>
+              </select>
+            </label>
+            <label class="ai-field"><span>Модель</span>
+              <input id="ai-model" list="ai-model-list" placeholder="Модель" spellcheck="false" autocomplete="off">
+              <datalist id="ai-model-list"></datalist>
+            </label>
+            <label class="ai-field" id="ai-url-field" hidden><span>Адрес API</span>
+              <input id="ai-url" placeholder="https://api.example.com/v1/chat/completions" spellcheck="false" hidden>
+            </label>
+            <label class="ai-field"><span>API-ключ</span>
+              <input id="ai-key" type="password" placeholder="AI API-ключ" autocomplete="new-password" spellcheck="false">
+            </label>
           </div>
-          <textarea id="ai-query" rows="2" spellcheck="false"
-            placeholder="Например: космическая фантастика уровня «Интерстеллара» и «Прибытия», что-нибудь вдумчивое, не боевик"></textarea>
+          <label class="ai-field"><span>Запрос</span>
+            <textarea id="ai-query" rows="3" spellcheck="false"
+              placeholder="Например: космическая фантастика уровня «Интерстеллара» и «Прибытия», что-нибудь вдумчивое, не боевик"></textarea>
+          </label>
           <div class="ai-row">
+            <span class="ai-row-label">Фильмов</span>
             <input id="ai-count" type="number" min="1" max="20" step="1" value="7"
                    title="Сколько фильмов предложить (1–20)">
             <button class="btn ghost" id="ai-check" title="Отправить минимальный тестовый запрос">Проверить ключ</button>
@@ -602,14 +617,14 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const LS_KEY = 'movievote.v1';
 const TYPE_RU = {movie:'фильм', 'tv-series':'сериал', 'tv-show':'ТВ-шоу', cartoon:'мультфильм', anime:'аниме', 'animated-series':'мультсериал'};
 
-let state = { apiKey:'', rows:[], eliminated:[], ai:{provider:'zai', model:'', key:'', url:''} };
+let state = { apiKey:'', rows:[], eliminated:[], ai:{provider:'zai', model:'', key:'', url:'', keys:{}} };
 function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch{} }
 function load(){
   try{
     const s = JSON.parse(localStorage.getItem(LS_KEY));
     if (s && Array.isArray(s.rows)) state = {
       apiKey:s.apiKey||'', rows:s.rows, eliminated:Array.isArray(s.eliminated)?s.eliminated:[],
-      ai: Object.assign({provider:'zai', model:'', key:'', url:''}, s.ai||{}),
+      ai: Object.assign({provider:'zai', model:'', key:'', url:'', keys:{}}, s.ai||{}),
     };
   }catch{}
 }
@@ -1080,13 +1095,23 @@ function saveDebounced(){ clearTimeout(saveT); saveT = setTimeout(save, 300); }
 const keyInput = $('#api-key'), apiStatus = $('#api-status');
 function applyKeyUI(){
   document.body.classList.toggle('demo', !state.apiKey);
-  if (!state.apiKey){ apiStatus.className='api-status'; apiStatus.textContent = 'Демо-режим: без ключа постеры будут заглушками.'; }
+  apiStatus.className = 'api-status';
+  apiStatus.textContent = state.apiKey
+    ? 'Ключ ПоискКино заполнен — нажмите «Проверить», чтобы увидеть остаток суточного лимита.'
+    : 'Демо-режим: без ключа постеры будут заглушками.';
 }
 keyInput.value = state.apiKey;
 $('#api-check').onclick = async () => {
-  const key = keyInput.value.trim();
-  state.apiKey = key; save(); applyKeyUI();
-  if (!key){ toast('Ключ убран — включён демо-режим'); return; }
+  const key = keyInput.value.trim() || state.apiKey || '';   /* пустое поле не стирает сохранённый ключ */
+  if (!key){
+    apiStatus.className = 'api-status';
+    apiStatus.textContent = 'Ключа нет — впишите его в поле или нажмите «↻ Перечитать env».';
+    toast('Сначала укажите ключ ПоискКино', 'err');
+    return;
+  }
+  state.apiKey = key;
+  if (!keyInput.value.trim()) keyInput.value = key;   /* ключ был в state, а поле пустое (env ещё грузился) */
+  save(); applyKeyUI();
   apiStatus.className = 'api-status'; apiStatus.textContent = 'Проверяем ключ…';
   try{
     const t = await pkTokenInfo();
@@ -1104,6 +1129,7 @@ $('#api-check').onclick = async () => {
 keyInput.addEventListener('input', () => { state.apiKey = keyInput.value.trim(); save(); applyKeyUI(); });
 
 /* ════════════════════════ автозагрузка ключей из файла env ════════════════════════ */
+const AI_PROV_LABELS = { zai:'Z.ai', anthropic:'Claude', openai:'OpenAI', deepseek:'DeepSeek', custom:'свой сервис' };
 let envFound = null; /* null — файл не искали; true/false — найден при последнем чтении */
 async function loadEnv(){
   let text = null;
@@ -1135,10 +1161,26 @@ async function loadEnv(){
   });
   let applied = [];
   if (kv.POISKKINO_API_KEY && kv.POISKKINO_API_KEY !== state.apiKey){ state.apiKey = kv.POISKKINO_API_KEY; keyInput.value = state.apiKey; applied.push('ПоискКино'); }
-  if (kv.AI_PROVIDER && ['zai','openai','deepseek','custom'].includes(kv.AI_PROVIDER) && kv.AI_PROVIDER !== state.ai.provider){ state.ai.provider = kv.AI_PROVIDER; applied.push('ИИ-провайдер'); }
+  if (kv.AI_PROVIDER && ['zai','anthropic','openai','deepseek','custom'].includes(kv.AI_PROVIDER) && kv.AI_PROVIDER !== state.ai.provider){ state.ai.provider = kv.AI_PROVIDER; applied.push('ИИ-провайдер'); }
   if (kv.AI_MODEL && kv.AI_MODEL !== state.ai.model){ state.ai.model = kv.AI_MODEL; applied.push('ИИ-модель'); }
   if (kv.AI_API_URL && kv.AI_API_URL !== state.ai.url){ state.ai.url = kv.AI_API_URL; applied.push('ИИ-адрес'); }
-  if (kv.AI_API_KEY && kv.AI_API_KEY !== state.ai.key){ state.ai.key = kv.AI_API_KEY; applied.push('ИИ-ключ'); }
+  /* ключи по провайдерам: ZAI_API_KEY → zai и т.д.; ключ выбранного провайдера
+     попадает в рабочее поле, остальные запоминаются и подставятся при переключении */
+  state.ai.keys = state.ai.keys || {};
+  const aiEnvKeys = { ZAI_API_KEY:'zai', ANTHROPIC_API_KEY:'anthropic', OPENAI_API_KEY:'openai', DEEPSEEK_API_KEY:'deepseek', CUSTOM_API_KEY:'custom' };
+  for (const name of Object.keys(aiEnvKeys)){
+    const v = kv[name], pid = aiEnvKeys[name];
+    if (!v) continue;
+    const cur = pid === state.ai.provider ? state.ai.key : state.ai.keys[pid];
+    if (v !== cur){
+      if (pid === state.ai.provider) state.ai.key = v; else state.ai.keys[pid] = v;
+      applied.push('ИИ-ключ ' + (AI_PROV_LABELS[pid] || pid));
+    }
+  }
+  /* общий AI_API_KEY — запасной: только если у выбранного провайдера нет своей строки в env */
+  if (kv.AI_API_KEY && !kv[Object.keys(aiEnvKeys).find(n => aiEnvKeys[n] === state.ai.provider)] && kv.AI_API_KEY !== state.ai.key){
+    state.ai.key = kv.AI_API_KEY; applied.push('ИИ-ключ (общий)');
+  }
   if (applied.length){
     applyKeyUI(); applyAiUI(); save();
     toast('Из файла env загружено: ' + applied.join(', '), 'ok');
@@ -1166,7 +1208,7 @@ function applyAiUI(){
   aiProvSel.value = p;
   aiModelInp.value = state.ai.model || AI_PROVIDERS[p].model || '';
   aiModelInp.placeholder = AI_PROVIDERS[p].model || 'Модель';
-  aiUrlInp.hidden = p !== 'custom';
+  $('#ai-url-field').hidden = p !== 'custom';
   aiUrlInp.value = state.ai.url || '';
   aiKeyInp.value = state.ai.key || '';
   fillModelDatalist(MODEL_LISTS[p]);
@@ -1191,7 +1233,14 @@ async function aiFetchModels(){
     if (ai.provider === state.ai.provider) fillModelDatalist(MODEL_LISTS[ai.provider]);
   }catch{}   /* без списка поле остаётся обычным вводом */
 }
-aiProvSel.addEventListener('change', () => { state.ai.provider = aiProvSel.value; state.ai.model = ''; save(); applyAiUI(); aiFetchModels(); });
+aiProvSel.addEventListener('change', () => {
+  state.ai.keys = state.ai.keys || {};
+  state.ai.keys[state.ai.provider] = state.ai.key;          /* запомнить ключ прежнего провайдера */
+  state.ai.provider = aiProvSel.value;
+  state.ai.model = '';
+  state.ai.key = state.ai.keys[state.ai.provider] || '';    /* подставить ключ выбранного */
+  save(); applyAiUI(); aiFetchModels();
+});
 [aiModelInp, aiUrlInp, aiKeyInp].forEach(inp => inp.addEventListener('input', () => {
   state.ai.model = aiModelInp.value.trim();
   state.ai.url = aiUrlInp.value.trim();
@@ -1918,6 +1967,13 @@ applyKeyUI();
 applyAiUI();
 showView('settings');
 loadEnv();
+/* Chromium при обновлении страницы сам возвращает в поля паролей то, что
+   вводили вручную раньше (восстановление форм) — там может лежать старый
+   ключ. После показа страницы восстанавливаем сохранённые значения. */
+window.addEventListener('pageshow', () => {
+  keyInput.value = state.apiKey || '';
+  applyAiUI();
+});
 </script>
 </body>
 </html>

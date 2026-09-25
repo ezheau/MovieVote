@@ -50,6 +50,12 @@ class Handler(SimpleHTTPRequestHandler):
     def log_message(self, fmt, *args):
         pass  # тихий лог
 
+    def end_headers(self):
+        # страница и env всегда должны быть свежими: правки JS вступают
+        # в силу сразу после F5, без повторного обновления
+        self.send_header('Cache-Control', 'no-cache')
+        super().end_headers()
+
     # ── CORS (на случай открытия страницы с другого порта) ──
     def _cors(self):
         self.send_header('Access-Control-Allow-Origin', '*')

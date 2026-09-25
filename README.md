@@ -32,12 +32,17 @@ python server.py 8080     # или свой порт
 
 ```
 # База фильмов ПоискКино — токен выдаёт Telegram-бот @poiskkinodev_bot
-KP_TOKEN=
+POISKKINO_API_KEY=
 
-# ИИ-провайдеры (достаточно одного)
-ZAI_TOKEN=
-OPENAI_TOKEN=
-DEEPSEEK_TOKEN=
+# ИИ-провайдер: zai | anthropic | openai | deepseek | custom
+AI_PROVIDER=zai
+# Ключи можно хранить все сразу — используется ключ выбранного провайдера
+ZAI_API_KEY=
+ANTHROPIC_API_KEY=
+OPENAI_API_KEY=
+DEEPSEEK_API_KEY=
+# Адрес API — нужен только для AI_PROVIDER=custom
+AI_API_URL=
 ```
 
 Файл `env` автоматически подхватывается локальным сервером и не публикуется
